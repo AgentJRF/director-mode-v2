@@ -1,0 +1,16 @@
+{
+  "name": "director-mode",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:22",
+  // Install deps once the container is built, then start the Vite dev server on attach.
+  "postCreateCommand": "npm install",
+  "postAttachCommand": "npm run dev",
+  "forwardPorts": [5173],
+  "portsAttributes": {
+    "5173": { "label": "Director mode (Vite)", "onAutoForward": "openPreview" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "esbenp.prettier-vscode"]
+    }
+  }
+}
