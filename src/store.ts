@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import type { Camera, Channel, Ease, KeySource, Project, Target, Tool, Vec3 } from './types';
 import { clamp, eulerFromLookAt, evaluate, keysOf, poiPoint, round, uid, hasAnim } from './lib/eval';
 import { makeLight } from './lib/lightRig';
+import { R3 } from './three/shared';
 
 export type ModalKind = null | 'interp' | 'ai-image' | 'ai-video' | 'ai-review-image' | 'ai-review-video' | 'export';
 
@@ -221,7 +222,22 @@ export const useStore = create<StoreState>((set, get) => {
     setTool: t => { get().ui.tool = t; bump(); },
     toast: m => { get().ui.toast = m; bump(); setTimeout(() => { if (get().ui.toast === m) { get().ui.toast = ''; bump(); } }, 2600); },
     selectCamera: id => { get().project.activeCameraId = id; get().ui.inspect = 'camera'; get().ui.selectedKeyIds = []; get().ui.targetSelected = false; bump(); },
-    addCamera: () => { const p = get().project; const c = makeCamera('Camera ' + String(p.cameras.length + 1).padStart(2, '0'), undefined, nextColor()); p.cameras.push(c); p.activeCameraId = c.id; get().ui.inspect = 'camera'; bump(); },
+    addCamera: () => {
+      const p = get().project;
+      const c = makeCamera('Camera ' + String(p.cameras.length + 1).padStart(2, '0'), undefined, nextColor());
+      // Frame the new camera on the CURRENT Scene viewpoint (position + look direction + matching focal),
+      // so "New camera" captures exactly what you're looking at. Falls back to the default pose if the
+      // scene camera isn't mounted yet.
+      const sc = R3.sceneCam;
+      if (sc) {
+        c.transform.position = [round(sc.position.x, 3), round(sc.position.y, 3), round(sc.position.z, 3)];
+        const e = new THREE.Euler().setFromQuaternion(sc.quaternion, 'YXZ');
+        const r2d = THREE.MathUtils.radToDeg;
+        c.transform.rotation = [round(r2d(e.x), 2), round(r2d(e.y), 2), round(r2d(e.z), 2)];
+        c.optics.focalLength = Math.round(36 / (2 * Math.tan(THREE.MathUtils.degToRad(sc.fov) / 2))); // fov -> focal (36mm gauge)
+      }
+      p.cameras.push(c); p.activeCameraId = c.id; get().ui.inspect = 'camera'; bump();
+    },
     removeCamera: id => {
       const p = get().project;
       const idx = p.cameras.findIndex(c => c.id === id); if (idx < 0) return;

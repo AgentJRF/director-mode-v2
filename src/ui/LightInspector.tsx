@@ -62,16 +62,20 @@ export default function LightInspector() {
 
   return (
     <>
-      <div className="sect">
-        <div className="sect-t" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>{l.name}</span>
-          <span style={{ display: 'flex', gap: 6 }}>
-            <button className="btn-sm" title="Duplicate" onClick={() => duplicateLight(l.id)}>⧉</button>
-            <button className="btn-sm danger" title="Delete" onClick={() => removeLight(l.id)}>🗑</button>
-          </span>
+      {/* env is a single scene-wide IBL — its name/type/duplicate/delete header is redundant
+          (delete it from the outliner). Other lights keep the header. */}
+      {l.kind !== 'env' && (
+        <div className="sect">
+          <div className="sect-t" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>{l.name}</span>
+            <span style={{ display: 'flex', gap: 6 }}>
+              <button className="btn-sm" title="Duplicate" onClick={() => duplicateLight(l.id)}>⧉</button>
+              <button className="btn-sm danger" title="Delete" onClick={() => removeLight(l.id)}>🗑</button>
+            </span>
+          </div>
+          <div className="row"><span className="row-lead"><span className="kf-spacer" /><label>Type</label></span><span className="val">{lightKindLabel(l.kind)}</span></div>
         </div>
-        <div className="row"><span className="row-lead"><span className="kf-spacer" /><label>Type</label></span><span className="val">{lightKindLabel(l.kind)}</span></div>
-      </div>
+      )}
 
       {l.kind === 'env' && (
         <div className="sect">

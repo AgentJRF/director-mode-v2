@@ -1,4 +1,4 @@
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { Suspense, useRef, useEffect } from 'react';
 import * as THREE from 'three';
 import { PerspectiveCamera, OrbitControls, Grid } from '@react-three/drei';
@@ -18,7 +18,15 @@ import LightGizmos from './LightGizmos';
 import LightInfluence from './LightInfluence';
 import MultiviewRenderer from './multiview/MultiviewRenderer';
 import { useStore, PIVOT, S } from '../store';
+import { R3 } from './shared';
 import { clamp, evalChannel } from '../lib/eval';
+
+// Always expose the Scene editor camera (even with zero cameras, when SceneGizmos isn't mounted) so
+// "New camera" can frame itself on the current viewpoint.
+function SceneCamBridge() {
+  useFrame(({ camera }) => { R3.sceneCam = camera as THREE.PerspectiveCamera; });
+  return null;
+}
 
 // Editor viewport uses a neutral Dimension-style gray; the Camera POV keeps the studio dark so the
 // final render/backdrop is unchanged.
@@ -89,6 +97,7 @@ export default function Scene() {
       <PerspectiveCamera ref={renderCamRef} makeDefault={mode === 'camera'} fov={45} near={0.1} far={200} position={[4, 2.2, 5]} />
       <PerspectiveCamera ref={sceneCamRef} makeDefault={mode === 'scene'} fov={50} near={0.1} far={500} position={[2.9, 1.95, 4.4]} />
       <ViewBackground />
+      {mode === 'scene' && <SceneCamBridge />}
       <SceneLights />
       <Floor />
       <EditorGrid />
