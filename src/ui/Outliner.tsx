@@ -4,7 +4,7 @@ import { S } from '../store';
 import { useRev } from './bits';
 import { selectLight, addLight, removeLight } from '../lib/lights';
 import { lightHideKey } from '../lib/lightRig';
-import { IcCamera, IcCube, IcTarget, IcTrash, IcEye, IcFloor } from './icons';
+import { IcCamera, IcCube, IcTarget, IcTrash, IcEye } from './icons';
 import type { LightKind } from '../types';
 
 function Eye({ id }: { id: string }) {
@@ -143,7 +143,7 @@ export default function Outliner() {
           })}
         </Group>
 
-        <Group title="Objects" count={OBJECTS.length + 1} open={open.objects} onToggle={() => toggle('objects')}>
+        <Group title="Objects" count={OBJECTS.length} open={open.objects} onToggle={() => toggle('objects')}>
           {OBJECTS.map(o => (
             <div key={o.id} className="ol-row" onContextMenu={e => onTargetContext(e, o.id)}>
               <span className="ol-ic">{o.icon()}</span>
@@ -152,18 +152,6 @@ export default function Outliner() {
               <Eye id={o.id} />
             </div>
           ))}
-          {/* Backdrop = a visible studio ground so the product/pedestal don't float. Eye toggles it,
-              the swatch sets the ground+background colour (they blend for a seamless sweep). */}
-          <div className="ol-row">
-            <span className="ol-ic" style={{ color: proj.backdrop.enabled ? proj.backdrop.color : undefined }}><IcFloor size={14} /></span>
-            <span className="nm">Backdrop</span>
-            <input type="color" value={proj.backdrop.color} title="Backdrop colour"
-              onClick={e => e.stopPropagation()} onChange={e => st.setBackdrop({ color: e.target.value })}
-              style={{ width: 22, height: 16, padding: 0, border: '1px solid var(--line-2)', borderRadius: 3, background: 'none', cursor: 'pointer', marginRight: 2 }} />
-            <span className="ol-eye" title={proj.backdrop.enabled ? 'Hide backdrop' : 'Show backdrop'}
-              style={{ opacity: proj.backdrop.enabled ? 1 : undefined }}
-              onClick={e => { e.stopPropagation(); st.setBackdrop({ enabled: !proj.backdrop.enabled }); }}><IcEye off={!proj.backdrop.enabled} size={14} /></span>
-          </div>
         </Group>
       </div>
 

@@ -21,7 +21,7 @@ function PreviewFloor() {
   const bd = useStore(s => s.project.backdrop);
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-      <circleGeometry args={[26, 64]} />
+      <circleGeometry args={[bd.enabled ? 400 : 26, 64]} />
       {bd.enabled ? <meshStandardMaterial color={bd.color} roughness={0.95} metalness={0} /> : <shadowMaterial transparent opacity={0.35} />}
     </mesh>
   );

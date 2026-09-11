@@ -106,6 +106,17 @@ export default function LightInspector() {
                 style={{ width: 34, height: 22, padding: 0, border: '1px solid var(--line-2)', borderRadius: 4, background: 'none', cursor: l.colorize ? 'pointer' : 'not-allowed', opacity: l.colorize ? 1 : 0.4 }} />
             </span>
           </div>
+          {/* Background = a seamless studio colour that fills the backdrop and grounds the product
+              (the floor becomes a lit, shadow-catching surface of this colour). Like Stager's
+              Environment > Background. */}
+          <div className="row">
+            <span className="row-lead"><span className="kf-spacer" /><label>Background</label></span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" checked={st.project.backdrop.enabled} onChange={e => st.setBackdrop({ enabled: e.target.checked })} title="Fill the background with a colour that catches shadows + light" />
+              <input type="color" value={st.project.backdrop.color} disabled={!st.project.backdrop.enabled} onChange={e => st.setBackdrop({ color: e.target.value })}
+                style={{ width: 34, height: 22, padding: 0, border: '1px solid var(--line-2)', borderRadius: 4, background: 'none', cursor: st.project.backdrop.enabled ? 'pointer' : 'not-allowed', opacity: st.project.backdrop.enabled ? 1 : 0.4 }} />
+            </span>
+          </div>
         </div>
       )}
 

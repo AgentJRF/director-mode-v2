@@ -35,10 +35,9 @@ function ViewBackground() {
   const mode = useStore(s => s.ui.viewMode);
   const bd = useStore(s => s.project.backdrop);
   useEffect(() => {
-    // In the Camera view (final look), a backdrop makes the background match the ground colour so the
-    // visible floor blends into a seamless "infinity" sweep. The Scene editor keeps its neutral gray.
-    const camCol = bd.enabled ? new THREE.Color(bd.color).getHex() : 0x1a1e22;
-    const col = mode === 'camera' ? camCol : 0x2c2f34;
+    // Background option: when on, the whole background (both views) is the chosen colour, and the
+    // seamless lit ground blends into it — no visible object/edge. Off → dark studio / gray editor.
+    const col = bd.enabled ? new THREE.Color(bd.color).getHex() : (mode === 'camera' ? 0x1a1e22 : 0x2c2f34);
     scene.background = new THREE.Color(col);
     scene.fog = new THREE.Fog(col, 22, mode === 'camera' ? 48 : 65);
   }, [mode, scene, bd.enabled, bd.color]);
@@ -52,8 +51,9 @@ function Floor() {
   const bd = S().project.backdrop;
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow userData={{ focusPickable: true }}>
-      <circleGeometry args={[26, 64]} />
-      {/* Backdrop ON → a visible ground (product no longer floats); OFF → a pure shadow catcher. */}
+      {/* Background ON → a large lit ground that fades (via fog) into the matching background, so it
+          reads as a seamless studio (not an object) while catching shadows + light. OFF → shadow catcher. */}
+      <circleGeometry args={[bd.enabled ? 400 : 26, 64]} />
       {bd.enabled
         ? <meshStandardMaterial color={bd.color} roughness={0.95} metalness={0} />
         : <shadowMaterial transparent opacity={0.35} />}
