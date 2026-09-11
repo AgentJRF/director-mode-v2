@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { ReactElement } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 import { S } from '../store';
 import { useRev } from './bits';
 import { selectLight, addLight, removeLight } from '../lib/lights';
 import { lightHideKey } from '../lib/lightRig';
 import { IcCamera, IcCube, IcTarget, IcTrash, IcEye } from './icons';
+import type { LightKind } from '../types';
 
 function Eye({ id }: { id: string }) {
   const off = !!S().ui.hidden[id];
@@ -27,11 +28,19 @@ function TargetBadge() {
   );
 }
 
-const Bulb = () => (
-  <svg viewBox="0 0 18 18" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 2.5a4.2 4.2 0 0 0-2.4 7.6c.5.4.8.9.8 1.5h3.2c0-.6.3-1.1.8-1.5A4.2 4.2 0 0 0 9 2.5Z" /><path d="M7.4 13.4h3.2M7.8 15h2.4" />
-  </svg>
-);
+// Per-kind light glyphs so each row reads like its light type (mirrors the toolbar's line-icon style).
+function LightGlyph({ kind }: { kind: LightKind }) {
+  const p = { width: 14, height: 14, viewBox: '0 0 18 18', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
+  switch (kind) {
+    case 'spot': return <svg {...p}><path d="M6.5 2.5h5l2.5 6.5h-10Z" /><path d="M6 12h6M7.2 15h3.6" /></svg>;
+    case 'directional': return <svg {...p}><circle cx="9" cy="9" r="3" /><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.8 3.8l1.4 1.4M12.8 12.8l1.4 1.4M14.2 3.8l-1.4 1.4M5.2 12.8l-1.4 1.4" /></svg>;
+    case 'point': return <svg {...p}><circle cx="9" cy="9" r="2.6" /><path d="M9 2v1.8M9 14.2V16M2 9h1.8M14.2 9H16M4 4l1.3 1.3M12.7 12.7 14 14M14 4l-1.3 1.3M5.3 12.7 4 14" /></svg>;
+    case 'area': return <svg {...p}><rect x="3.5" y="4.5" width="11" height="9" rx="1.2" /><path d="M6 7.5h6M6 10.5h4" /></svg>;
+    case 'hemisphere': return <svg {...p}><path d="M3 13a6 6 0 0 1 12 0" /><line x1="2" y1="13.2" x2="16" y2="13.2" /></svg>;
+    case 'env': return <svg {...p}><circle cx="9" cy="9" r="6" /><ellipse cx="9" cy="9" rx="2.7" ry="6" /><line x1="3" y1="9" x2="15" y2="9" /></svg>;
+    default: return <svg {...p}><circle cx="9" cy="9" r="3" /></svg>;
+  }
+}
 
 // Scene objects only — the ground + grid are viewport furniture (not listed here).
 const OBJECTS: { id: string; label: string; icon: () => ReactElement }[] = [
@@ -39,21 +48,45 @@ const OBJECTS: { id: string; label: string; icon: () => ReactElement }[] = [
   { id: 'pedestal', label: 'Pedestal', icon: () => <IcCube size={14} /> },
 ];
 
+const Chevron = ({ open }: { open: boolean }) => (
+  <svg className={'ol-chev' + (open ? '' : ' closed')} width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M2.5 4 5 6.5 7.5 4" /></svg>
+);
+
+// A collapsible outliner group: chevron + title + item count, an optional add control, and a nested
+// (left-rail) body — the "layer stack" feel.
+function Group({ title, count, open, onToggle, onAdd, addTitle, children }:
+  { title: string; count: number; open: boolean; onToggle: () => void; onAdd?: (e: React.MouseEvent) => void; addTitle?: string; children: ReactNode }) {
+  return (
+    <div className="ol-grp">
+      <div className="ol-grp-h" onClick={onToggle}>
+        <Chevron open={open} />
+        <span className="ol-grp-t">{title}</span>
+        <span className="ol-count">{count}</span>
+        {onAdd && <span className="ol-add" title={addTitle} onClick={e => { e.stopPropagation(); onAdd(e); }}>+</span>}
+      </div>
+      {open && <div className="ol-body">{children}</div>}
+    </div>
+  );
+}
+
 export default function Outliner() {
   useRev();
   const st = S(); const proj = st.project; const cam = st.active();
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [camMenu, setCamMenu] = useState<{ id: string; x: number; y: number } | null>(null);
+  const [addLightMenu, setAddLightMenu] = useState<{ x: number; y: number } | null>(null);
+  const [open, setOpen] = useState({ cameras: true, lights: true, objects: true });
+  const toggle = (k: keyof typeof open) => setOpen(o => ({ ...o, [k]: !o[k] }));
 
   useEffect(() => {
-    if (!menu && !camMenu) return;
-    const close = () => { setMenu(null); setCamMenu(null); };
+    if (!menu && !camMenu && !addLightMenu) return;
+    const close = () => { setMenu(null); setCamMenu(null); setAddLightMenu(null); };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
     window.addEventListener('pointerdown', close);
     window.addEventListener('scroll', close, true);
     window.addEventListener('keydown', onKey);
     return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('scroll', close, true); window.removeEventListener('keydown', onKey); };
-  }, [menu, camMenu]);
+  }, [menu, camMenu, addLightMenu]);
 
   const isTarget = (id: string) => cam.target?.type === 'object' && cam.target.objectId === id;
   const onTargetContext = (e: React.MouseEvent, id: string) => {
@@ -63,58 +96,78 @@ export default function Outliner() {
     setMenu({ x: e.clientX, y: e.clientY });
   };
 
+  const LIGHT_KINDS: { kind: LightKind; label: string }[] = [
+    { kind: 'spot', label: 'Spot' }, { kind: 'area', label: 'Area' },
+    { kind: 'hemisphere', label: 'Dome' }, { kind: 'point', label: 'Point' },
+  ];
+
   return (
     <>
       <div className="insp-h">Scene</div>
-      <div className="sect">
-        <div className="sect-t">Cameras</div>
-        {proj.cameras.map(c => {
-          const active = c.id === proj.activeCameraId;
-          return (
-            <div key={c.id} className={'ol-row' + (active ? ' sel' : '')} onClick={() => st.selectCamera(c.id)}
-              onContextMenu={e => { e.preventDefault(); st.selectCamera(c.id); setCamMenu({ id: c.id, x: e.clientX, y: e.clientY }); }}>
-              <span className="ol-ic" style={{ color: c.color }}><IcCamera size={14} /></span>
-              <span className="nm">{c.name}</span>
-              {active && <span className={'ol-dot' + (st.ui.viewMode === 'scene' ? ' scene' : '')}
-                title={st.ui.viewMode === 'camera' ? 'Camera POV — click for Scene view' : 'Scene view — click for Camera POV'}
-                onClick={e => { e.stopPropagation(); st.setViewMode(st.ui.viewMode === 'camera' ? 'scene' : 'camera'); }} />}
-              <span className="ol-eye" title="Delete camera"
-                onClick={e => { e.stopPropagation(); st.removeCamera(c.id); }}><IcTrash size={13} /></span>
-              <Eye id={'cam:' + c.id} />
-            </div>
-          );
-        })}
-        <button className="btn-sm btn-full" style={{ marginTop: 6 }} onClick={() => st.addCamera()}>+ New camera</button>
+      <div className="sect ol">
+        <Group title="Cameras" count={proj.cameras.length} open={open.cameras} onToggle={() => toggle('cameras')}
+          onAdd={() => st.addCamera()} addTitle="New camera">
+          {proj.cameras.length === 0 && <div className="ol-empty">No cameras — click + to add one.</div>}
+          {proj.cameras.map(c => {
+            const active = c.id === proj.activeCameraId;
+            return (
+              <div key={c.id} className={'ol-row' + (active ? ' sel' : '')} onClick={() => st.selectCamera(c.id)}
+                onContextMenu={e => { e.preventDefault(); st.selectCamera(c.id); setCamMenu({ id: c.id, x: e.clientX, y: e.clientY }); }}>
+                <span className="ol-ic" style={{ color: c.color }}><IcCamera size={14} /></span>
+                <span className="nm">{c.name}</span>
+                {active && <span className={'ol-dot' + (st.ui.viewMode === 'scene' ? ' scene' : '')}
+                  title={st.ui.viewMode === 'camera' ? 'Camera POV — click for Scene view' : 'Scene view — click for Camera POV'}
+                  onClick={e => { e.stopPropagation(); st.setViewMode(st.ui.viewMode === 'camera' ? 'scene' : 'camera'); }} />}
+                <span className="ol-eye" title="Delete camera"
+                  onClick={e => { e.stopPropagation(); st.removeCamera(c.id); }}><IcTrash size={13} /></span>
+                <Eye id={'cam:' + c.id} />
+              </div>
+            );
+          })}
+        </Group>
 
-        <div className="sect-t" style={{ marginTop: 12 }}>Lights</div>
-        {proj.lights.map(l => {
-          const on = l.id === proj.activeLightId && st.ui.inspect === 'light';
-          return (
-            <div key={l.id} className={'ol-row' + (on ? ' sel' : '')} onClick={() => selectLight(l.id)}>
-              <span className="ol-ic" style={{ color: l.color }}><Bulb /></span>
-              <span className="nm">{l.name}</span>
-              <span className="ol-eye" title="Delete light" onClick={e => { e.stopPropagation(); removeLight(l.id); }}><IcTrash size={13} /></span>
-              <Eye id={lightHideKey(l.id)} />
-            </div>
-          );
-        })}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 6 }}>
-          <button className="btn-sm" title="Add an area (rectangle) light" onClick={() => addLight('area')}>+ Area</button>
-          <button className="btn-sm" title="Add a spot light" onClick={() => addLight('spot')}>+ Spot</button>
-          <button className="btn-sm" title="Add a dome (hemisphere) light" onClick={() => addLight('hemisphere')}>+ Dome</button>
-          <button className="btn-sm" title="Add a point light" onClick={() => addLight('point')}>+ Point</button>
-        </div>
+        <Group title="Lights" count={proj.lights.length} open={open.lights} onToggle={() => toggle('lights')}
+          onAdd={e => setAddLightMenu({ x: e.clientX, y: e.clientY })} addTitle="Add a light">
+          {proj.lights.length === 0 && <div className="ol-empty">No lights — click + to add one.</div>}
+          {proj.lights.map(l => {
+            const on = l.id === proj.activeLightId && st.ui.inspect === 'light';
+            return (
+              <div key={l.id} className={'ol-row' + (on ? ' sel' : '')} onClick={() => selectLight(l.id)}>
+                <span className="ol-ic" style={{ color: l.color }}><LightGlyph kind={l.kind} /></span>
+                <span className="nm">{l.name}</span>
+                <span className="ol-eye" title="Delete light" onClick={e => { e.stopPropagation(); removeLight(l.id); }}><IcTrash size={13} /></span>
+                <Eye id={lightHideKey(l.id)} />
+              </div>
+            );
+          })}
+        </Group>
 
-        <div className="sect-t" style={{ marginTop: 12 }}>Objects</div>
-        {OBJECTS.map(o => (
-          <div key={o.id} className="ol-row" onContextMenu={e => onTargetContext(e, o.id)}>
-            <span className="ol-ic">{o.icon()}</span>
-            <span className="nm">{o.label}</span>
-            {isTarget(o.id) && <TargetBadge />}
-            <Eye id={o.id} />
-          </div>
-        ))}
+        <Group title="Objects" count={OBJECTS.length} open={open.objects} onToggle={() => toggle('objects')}>
+          {OBJECTS.map(o => (
+            <div key={o.id} className="ol-row" onContextMenu={e => onTargetContext(e, o.id)}>
+              <span className="ol-ic">{o.icon()}</span>
+              <span className="nm">{o.label}</span>
+              {isTarget(o.id) && <TargetBadge />}
+              <Eye id={o.id} />
+            </div>
+          ))}
+        </Group>
       </div>
+
+      {addLightMenu && (
+        <div style={{
+          position: 'fixed', left: Math.min(addLightMenu.x, window.innerWidth - 168), top: addLightMenu.y, zIndex: 100,
+          background: 'var(--panel-2)', border: '1px solid var(--line-2)', borderRadius: 6,
+          boxShadow: '0 8px 30px rgba(0,0,0,.5)', padding: 4, minWidth: 150,
+        }} onPointerDown={e => e.stopPropagation()}>
+          {LIGHT_KINDS.map(({ kind, label }) => (
+            <button key={kind} className="btn-sm btn-full" style={{ border: 'none', justifyContent: 'flex-start', display: 'flex', gap: 8, alignItems: 'center' }}
+              onClick={() => { addLight(kind); setAddLightMenu(null); }}>
+              <span style={{ display: 'inline-flex', color: 'var(--ink-2)' }}><LightGlyph kind={kind} /></span>{label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {menu && (
         <div style={{
