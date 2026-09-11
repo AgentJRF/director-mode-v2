@@ -49,20 +49,19 @@ function ViewBackground() {
 function Floor() {
   useStore(s => s.rev);
   const bd = S().project.backdrop;
-  const r = bd.enabled ? 400 : 26;
-  // A ShadowMaterial catcher is ALWAYS present so cast shadows read even under strong IBL (a lit
-  // standard material would let the IBL wash the shadow out). With Background on we add a large lit
-  // ground of the chosen colour BENEATH it (fog-blended → seamless studio); the catcher sits a hair
-  // above to darken only where shadows fall.
+  // The ShadowMaterial catcher (unchanged from the no-background case, which shows shadows correctly)
+  // stays at y=0 and only DARKENS where shadows fall — so cast shadows read even under strong IBL.
+  // With Background on we add a large lit ground of the chosen colour just BENEATH it (fog-blended →
+  // seamless studio); the catcher, being transparent, shows that ground where there's no shadow.
   return (
     <group>
       {bd.enabled && (
-        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-          <circleGeometry args={[r, 64]} /><meshStandardMaterial color={bd.color} roughness={0.95} metalness={0} />
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+          <circleGeometry args={[400, 64]} /><meshStandardMaterial color={bd.color} roughness={0.95} metalness={0} />
         </mesh>
       )}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, bd.enabled ? 0.004 : 0, 0]} receiveShadow userData={{ focusPickable: true }}>
-        <circleGeometry args={[r, 64]} /><shadowMaterial transparent opacity={0.4} depthWrite={false} />
+      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow userData={{ focusPickable: true }}>
+        <circleGeometry args={[26, 64]} /><shadowMaterial transparent opacity={0.4} />
       </mesh>
     </group>
   );
