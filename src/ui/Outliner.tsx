@@ -28,14 +28,15 @@ function TargetBadge() {
   );
 }
 
-// Per-kind light glyphs so each row reads like its light type (mirrors the toolbar's line-icon style).
+// Per-kind light glyphs, drawn to match the Substance 3D Stager light-type icons (Adobe reference):
+// Area = quad emitter · Spot = cone · Point = ringed dot · Directional = corner rays.
 function LightGlyph({ kind }: { kind: LightKind }) {
   const p = { width: 14, height: 14, viewBox: '0 0 18 18', fill: 'none', stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
   switch (kind) {
-    case 'spot': return <svg {...p}><path d="M6.5 2.5h5l2.5 6.5h-10Z" /><path d="M6 12h6M7.2 15h3.6" /></svg>;
-    case 'directional': return <svg {...p}><circle cx="9" cy="9" r="3" /><path d="M9 1.5v2M9 14.5v2M1.5 9h2M14.5 9h2M3.8 3.8l1.4 1.4M12.8 12.8l1.4 1.4M14.2 3.8l-1.4 1.4M5.2 12.8l-1.4 1.4" /></svg>;
-    case 'point': return <svg {...p}><circle cx="9" cy="9" r="2.6" /><path d="M9 2v1.8M9 14.2V16M2 9h1.8M14.2 9H16M4 4l1.3 1.3M12.7 12.7 14 14M14 4l-1.3 1.3M5.3 12.7 4 14" /></svg>;
-    case 'area': return <svg {...p}><rect x="3.5" y="4.5" width="11" height="9" rx="1.2" /><path d="M6 7.5h6M6 10.5h4" /></svg>;
+    case 'spot': return <svg {...p}><path d="M9 3 L4.6 13 Q9 14.8 13.4 13 Z" /></svg>;
+    case 'area': return <svg {...p}><path d="M3.6 6.4 L12 3.4 L14.4 11.6 L6 14.6 Z" /></svg>;
+    case 'point': return <svg {...p}><circle cx="9" cy="9" r="5.2" /><circle cx="9" cy="9" r="1.5" fill="currentColor" stroke="none" /></svg>;
+    case 'directional': return <svg {...p}><circle cx="4" cy="4" r="1.2" fill="currentColor" stroke="none" /><path d="M4 8.4 A4.4 4.4 0 0 1 8.4 4" /><path d="M4 11.4 A7.4 7.4 0 0 1 11.4 4" /><path d="M4 14.4 A10.4 10.4 0 0 1 14.4 4" /></svg>;
     case 'hemisphere': return <svg {...p}><path d="M3 13a6 6 0 0 1 12 0" /><line x1="2" y1="13.2" x2="16" y2="13.2" /></svg>;
     case 'env': return <svg {...p}><circle cx="9" cy="9" r="6" /><ellipse cx="9" cy="9" rx="2.7" ry="6" /><line x1="3" y1="9" x2="15" y2="9" /></svg>;
     default: return <svg {...p}><circle cx="9" cy="9" r="3" /></svg>;
