@@ -1,10 +1,13 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
+import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
+import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import { S, useStore } from '../store';
 import { evalLight, lightPoi } from '../lib/lightEval';
 import { lightHideKey } from '../lib/lightRig';
+import { hdriThumbs, makeHdriThumb } from '../lib/hdriThumb';
 import type { Light } from '../types';
 
 // RectAreaLight needs its BRDF lookup tables initialised once before any area light renders.
@@ -82,10 +85,51 @@ function LightNode({ light }: { light: Light }) {
   }
 }
 
+const hdriExt = (s: string) => { const m = /\.([a-z0-9]+)(?:\?|#|$)/i.exec(s); return (m ? m[1] : '').toLowerCase(); };
+
+// Image-based environment light (IBL). Loads the equirect HDRI with the loader matching its extension
+// (.exr → EXRLoader, else RGBELoader for .hdr), PMREMs it, and drives scene.environment. We load it
+// ourselves (rather than drei's <Environment>) so a runtime object URL from a file pick — which has no
+// extension — still works, using `hdriName` to pick the loader. Intensity + Y rotation are cheap live
+// writes each frame (no PMREM rebuild). Hidden via the eye toggle (SceneLights unmounts this).
+function EnvNode({ light }: { light: Light }) {
+  const { gl, scene } = useThree();
+  const url = light.hdri;
+  const ext = hdriExt(light.hdriName || url || '');
+  useEffect(() => {
+    if (!url) { scene.environment = null; return; }
+    let cancelled = false;
+    let rt: THREE.WebGLRenderTarget | null = null;
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const Loader = ext === 'exr' ? EXRLoader : RGBELoader;
+    new Loader().load(url, tex => {
+      if (cancelled) { tex.dispose(); pmrem.dispose(); return; }
+      // One-time flat thumbnail for the inspector (before the equirect mapping is set for PMREM).
+      if (!hdriThumbs.has(url)) { try { makeHdriThumb(gl, tex, url); S().bump(); } catch { /* preview is optional */ } }
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      rt = pmrem.fromEquirectangular(tex);
+      scene.environment = rt.texture;
+      tex.dispose(); pmrem.dispose();
+    }, undefined, () => pmrem.dispose());
+    return () => { cancelled = true; scene.environment = null; rt?.dispose(); };
+  }, [gl, scene, url, ext]);
+  useFrame(() => {
+    scene.environmentIntensity = light.intensity;
+    scene.environmentRotation.set(0, THREE.MathUtils.degToRad(light.envRotation ?? 0), 0);
+  });
+  return null;
+}
+
 // Renders all store lights. Re-renders only when lights are added/removed/retyped (rev bump);
 // per-frame value updates happen inside each LightNode's useFrame.
 export default function SceneLights() {
   useStore(s => s.rev);
-  const lights = S().project.lights;
-  return <>{lights.map(l => <LightNode key={l.id + ':' + l.kind} light={l} />)}</>;
+  const st = S();
+  const lights = st.project.lights;
+  const hidden = st.ui.hidden;
+  // env is declarative (<Environment>), so it can't self-hide in useFrame like a LightNode — gate it
+  // on the eye toggle here; other lights keep managing their own `visible` inside LightNode.
+  return <>{lights.map(l => l.kind === 'env'
+    ? (hidden[lightHideKey(l.id)] ? null : <EnvNode key={l.id} light={l} />)
+    : <LightNode key={l.id + ':' + l.kind} light={l} />)}</>;
 }

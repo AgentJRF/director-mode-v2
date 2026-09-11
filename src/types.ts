@@ -43,7 +43,7 @@ export interface Camera {
 // machinery. Animatable channels (position / poi / intensity) reuse `Keyframe`,
 // so lights land on the SAME timeline as cameras and inherit undo/redo for free.
 // ───────────────────────────────────────────────────────────────────────────
-export type LightKind = 'spot' | 'directional' | 'point' | 'ambient' | 'hemisphere' | 'area';
+export type LightKind = 'spot' | 'directional' | 'point' | 'ambient' | 'hemisphere' | 'area' | 'env';
 
 // Physical occluder projected by a spot (the auto-lighting "gobo").
 export interface LightGobo {
@@ -71,6 +71,11 @@ export interface Light {
   height?: number;              // area (RectAreaLight) emitter height
   gobo?: LightGobo;             // spot occluder
   castShadow?: boolean;
+  // env (image-based environment light / IBL) only:
+  hdri?: string;                // URL to the equirect map — a public path or a runtime object URL
+  hdriName?: string;            // original filename (display + extension → loader choice for object URLs)
+  envRotation?: number;         // spin the environment around Y (degrees)
+  colorize?: boolean;           // tint the environment by `color`
   keyframes: Keyframe[];        // animatable: 'position' (Vec3), 'poi' (Vec3), 'intensity' (number)
 }
 

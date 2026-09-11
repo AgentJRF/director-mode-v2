@@ -149,6 +149,11 @@ input:focus,select:focus{outline:none;border-color:var(--focus)}
 .ease-opt{border:1px solid var(--line-2);border-radius:5px;padding:6px;font-size:11px;color:var(--ink-2);text-align:center;background:var(--panel-2)}
 .ease-opt.sel{border-color:var(--amber-dim);color:var(--amber);background:var(--amber-ghost)}
 .chip-row{display:flex;flex-wrap:wrap;gap:5px}
+/* Clickable HDRI thumbnail (env light): the preview IS the load/replace control — hover reveals a hint. */
+.hdri-pick{position:relative;display:inline-flex;cursor:pointer;border:1px solid var(--line-2);border-radius:4px;overflow:hidden;line-height:0}
+.hdri-empty{width:72px;height:36px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--ink-2);line-height:1}
+.hdri-ovl{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#fff;background:rgba(0,0,0,.45);opacity:0;transition:opacity .12s}
+.hdri-pick:hover .hdri-ovl{opacity:1}
 .move-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px}
 .move-card{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border:1px solid var(--line-2);border-radius:8px;background:var(--panel-2);color:var(--ink-2);cursor:pointer;font-size:9px;letter-spacing:.02em;text-align:center;transition:border-color .12s,color .12s,background .12s}
 .move-card:hover{border-color:var(--amber-dim);color:var(--ink);background:var(--panel-2)}

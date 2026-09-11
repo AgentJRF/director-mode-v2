@@ -4,10 +4,12 @@ import { evalLight, lightPoi } from '../lib/lightEval';
 import {
   activeLight, lightKeysOf, removeLight, duplicateLight, lightKindLabel,
   setLightColor, setLightGroundColor, setLightAngle, setLightPenumbra, setLightCastShadow,
-  setLightWidth, setLightHeight, clearLightTarget,
+  setLightWidth, setLightHeight, clearLightTarget, setLightEnvRotation, setLightHdri,
   editLightIntensity, editLightPos, editLightPoi, toggleLightKey,
 } from '../lib/lights';
 import { round } from '../lib/eval';
+import { hdriThumbs } from '../lib/hdriThumb';
+import { IcTrash } from './icons';
 import type { Channel, Vec3 } from '../types';
 
 function KeyDot({ ch, value }: { ch: Channel; value: Vec3 | number }) {
@@ -71,6 +73,31 @@ export default function LightInspector() {
         <div className="row"><span className="row-lead"><span className="kf-spacer" /><label>Type</label></span><span className="val">{lightKindLabel(l.kind)}</span></div>
       </div>
 
+      {l.kind === 'env' && (
+        <div className="sect">
+          <div className="sect-t">Environment light</div>
+          <div className="row">
+            <span className="row-lead"><span className="kf-spacer" /><label>Image</label></span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* Click the thumbnail itself to load / replace the HDRI — no separate button. */}
+              <label className="hdri-pick" title={l.hdri ? `${l.hdriName || l.hdri} — click to replace` : 'Click to load a .hdr / .exr environment'}>
+                {l.hdri && hdriThumbs.get(l.hdri)
+                  ? <img src={hdriThumbs.get(l.hdri)} alt={l.hdriName || ''} style={{ width: 72, height: 36, objectFit: 'cover', display: 'block' }} />
+                  : <span className="hdri-empty">{l.hdri ? '…' : 'Load'}</span>}
+                <span className="hdri-ovl">{l.hdri ? 'Replace' : 'Load'}</span>
+                <input type="file" accept=".hdr,.exr,image/x-exr,image/vnd.radiance" style={{ display: 'none' }}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) setLightHdri(URL.createObjectURL(f), f.name); e.target.value = ''; }} />
+              </label>
+              {l.hdri && <button className="btn-sm danger" title="Remove HDRI" style={{ display: 'inline-flex', alignItems: 'center' }} onClick={() => setLightHdri(undefined)}><IcTrash size={13} /></button>}
+            </span>
+          </div>
+          {/* Stager shows intensity as a percentage; 100% = environmentIntensity 1.0. */}
+          <Slider label="Intensity" value={Math.round(l.intensity * 100)} min={0} max={400} step={1} unit="%" onChange={pct => editLightIntensity(pct / 100)} />
+          <Slider label="Rotation" value={Math.round(l.envRotation ?? 0)} min={0} max={360} step={1} unit="°" onChange={setLightEnvRotation} />
+        </div>
+      )}
+
+      {l.kind !== 'env' && (<>
       <div className="sect">
         <div className="sect-t">Light</div>
         <div className="row">
@@ -112,6 +139,7 @@ export default function LightInspector() {
           )}
         </div>
       )}
+      </>)}
     </>
   );
 }

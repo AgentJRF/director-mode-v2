@@ -77,7 +77,7 @@ export default function App() {
       if (e.key === ' ') { e.preventDefault(); const tl = st.project.timeline; if (tl.playhead >= tl.duration) st.setPlayhead(0); st.setPlaying(!tl.playing); }
       const map: Record<string, Tool> = { v: 'select', c: 'camera', t: 'target' };
       if (map[e.key]) st.setTool(map[e.key]);
-      if (e.key === 'r') st.setGizmoSpace(st.ui.gizmoSpace === 'world' ? 'local' : 'world');
+      if (e.key === 'r') st.toggleGizmoSpace();
       if (e.key === '4' && st.ui.viewMode === 'scene') st.setMultiview(!st.ui.multiview);
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (st.ui.targetSelected && st.active().target) st.setTarget(null); // selected target badge → remove target

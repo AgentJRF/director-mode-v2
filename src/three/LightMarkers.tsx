@@ -12,7 +12,7 @@ export default function LightMarkers() {
   return (
     <>
       {st.project.lights.map(l => {
-        if (l.kind === 'ambient' || l.kind === 'hemisphere') return null;
+        if (l.kind === 'ambient' || l.kind === 'hemisphere' || l.kind === 'env') return null;
         if (l.id === activeId) return null;
         if (st.ui.hidden[lightHideKey(l.id)]) return null;
         const p = evalLight(l, t).position;

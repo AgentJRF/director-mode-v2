@@ -18,13 +18,23 @@ const CubeIcon = () => (
 export default function ViewPills() {
   useRev();
   const ui = S().ui;
-  const world = ui.gizmoSpace === 'world';
+  // No camera yet → nothing to look through, so the Camera and Split views are disabled (greyed).
+  const hasCam = S().project.cameras.length > 0;
+  // The space toggle drives whichever gizmo is selected: the light's when the light panel is active,
+  // the camera's otherwise — so it never moves the other gizmo's frame.
+  const world = (ui.inspect === 'light' ? ui.gizmoSpaceLight : ui.gizmoSpace) === 'world';
   return (
     <div className="hud" style={{ top: 12, left: '50%', transform: 'translateX(-50%)', pointerEvents: 'auto', display: 'flex', gap: 8 }}>
       <div className="seg" style={{ background: 'rgba(0,0,0,.5)' }}>
-        <button className={ui.viewMode === 'camera' && !ui.split ? 'sel' : ''} onClick={() => { S().setSplit(false); S().setViewMode('camera'); }} title="Look through the camera">◉ Camera</button>
+        <button className={ui.viewMode === 'camera' && !ui.split ? 'sel' : ''} disabled={!hasCam}
+          style={!hasCam ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+          onClick={() => { S().setSplit(false); S().setViewMode('camera'); }}
+          title={hasCam ? 'Look through the camera' : 'Create a camera first'}>◉ Camera</button>
         <button className={ui.viewMode === 'scene' && !ui.split ? 'sel' : ''} onClick={() => { S().setSplit(false); S().setViewMode('scene'); }} title="Free editor view: see the camera + animation spline in the scene">⬚ Scene</button>
-        <button className={ui.split ? 'sel' : ''} onClick={() => S().setSplit(!ui.split)} title="Split view: Scene editor (left) + live Camera (right)">◫ Split</button>
+        <button className={ui.split ? 'sel' : ''} disabled={!hasCam}
+          style={!hasCam ? { opacity: 0.4, cursor: 'not-allowed' } : undefined}
+          onClick={() => S().setSplit(!ui.split)}
+          title={hasCam ? 'Split view: Scene editor (left) + live Camera (right)' : 'Create a camera first'}>◫ Split</button>
       </div>
       {ui.viewMode === 'scene' && (
         <div className="seg" style={{ background: 'rgba(0,0,0,.5)' }}>
@@ -35,7 +45,7 @@ export default function ViewPills() {
       {/* Gizmo space is NOT a view mode → set apart from the view toggles with a gap. */}
       {ui.viewMode === 'scene' && (
         <div className="seg" style={{ background: 'rgba(0,0,0,.5)', marginLeft: 22 }}>
-          <button onClick={() => S().setGizmoSpace(world ? 'local' : 'world')}
+          <button onClick={() => S().toggleGizmoSpace()}
             title={world ? 'Gizmo orientation: World — click for Object (R)' : 'Gizmo orientation: Object — click for World (R)'}
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {world ? <GlobeIcon /> : <CubeIcon />}

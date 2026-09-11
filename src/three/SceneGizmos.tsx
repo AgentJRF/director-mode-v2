@@ -242,7 +242,7 @@ export default function SceneGizmos() {
       {/* In multiview the PivotControls gizmo is hidden (it only works with the default camera);
           the camera body is tagged so useMultiviewInput can drag the camera per-view instead.
           During A→B interpolation it's hidden too — CameraMarkers draws all cameras for picking. */}
-      {!interp && <PivotControls matrix={matrix} autoTransform fixed scale={50} lineWidth={2} depthTest={false}
+      {!interp && st.ui.inspect !== 'light' && <PivotControls matrix={matrix} autoTransform fixed scale={50} lineWidth={2} depthTest={false}
         disableScaling activeAxes={[true, true, true]}
         disableAxes={multiview} disableSliders={multiview} disableRotations={multiview || !!cam.target}
         onDragStart={onDragStart} onDrag={onDrag} onDragEnd={onDragEnd}>

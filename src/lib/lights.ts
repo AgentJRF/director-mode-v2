@@ -32,7 +32,7 @@ function upsertLightKey(light: Light, ch: Channel, value: Vec3 | number, time: n
 export function lightKeysOf(light: Light, ch: Channel) { return lkeys(light, ch); }
 
 // ── CRUD ─────────────────────────────────────────────────────────────────────
-const KIND_LABEL: Record<LightKind, string> = { spot: 'Spot', directional: 'Directional', point: 'Point', ambient: 'Ambient', hemisphere: 'Dome', area: 'Area' };
+const KIND_LABEL: Record<LightKind, string> = { spot: 'Spot', directional: 'Directional', point: 'Point', ambient: 'Ambient', hemisphere: 'Dome', area: 'Area', env: 'Environment' };
 // Friendly type name for the UI (kind → label). Mirrors KIND_LABEL, exported for the inspector.
 export const lightKindLabel = (kind: LightKind) => KIND_LABEL[kind];
 
@@ -85,6 +85,15 @@ export const setLightDistance = (v: number) => withLight(l => { l.distance = Mat
 export const setLightWidth = (v: number) => withLight(l => { l.width = Math.max(0.05, v); });
 export const setLightHeight = (v: number) => withLight(l => { l.height = Math.max(0.05, v); });
 export const setLightCastShadow = (b: boolean) => withLight(l => { l.castShadow = b; });
+// env (IBL) statics
+export const setLightEnvRotation = (deg: number) => withLight(l => { l.envRotation = ((deg % 360) + 360) % 360; });
+export const setLightColorize = (b: boolean) => withLight(l => { l.colorize = b; });
+// Plug / replace / remove the HDRI. `hdri` may be a public path or a runtime object URL (from a file
+// pick); pass undefined to remove it. Revokes a previous object URL so swapped uploads don't leak.
+export const setLightHdri = (hdri: string | undefined, name?: string) => withLight(l => {
+  if (l.hdri && l.hdri.startsWith('blob:') && l.hdri !== hdri) URL.revokeObjectURL(l.hdri);
+  l.hdri = hdri; l.hdriName = name;
+});
 
 // ── animatable properties (position / POI / intensity) ──────────────────────
 export function editLightIntensity(v: number) {

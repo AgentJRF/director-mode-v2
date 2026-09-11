@@ -32,11 +32,13 @@ function ViewBackground() {
   }, [mode, scene]);
   return null;
 }
-// Ground is viewport furniture (not a scene object) — always present as the shadow catcher.
+// Ground is viewport furniture (not a scene object). It's a pure SHADOW CATCHER: a transparent
+// ShadowMaterial that shows ONLY cast shadows, never the disc itself — so the bright environment
+// (IBL) doesn't light up a visible floor disc behind the product. Still raycastable for focus picking.
 function Floor() {
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow userData={{ focusPickable: true }}>
-      <circleGeometry args={[26, 64]} /><meshStandardMaterial color={0x20252b} roughness={0.8} metalness={0.1} />
+      <circleGeometry args={[26, 64]} /><shadowMaterial transparent opacity={0.35} />
     </mesh>
   );
 }
@@ -75,6 +77,7 @@ export default function Scene() {
   const mode = useStore(s => s.ui.viewMode);
   const multiview = useStore(s => s.ui.multiview);
   const gizmoDragging = useStore(s => s.ui.gizmoDragging);
+  const inspect = useStore(s => s.ui.inspect);
   const hasCam = useStore(s => s.project.cameras.length > 0);
   const renderCamRef = useRef<THREE.PerspectiveCamera>(null);
   const sceneCamRef = useRef<THREE.PerspectiveCamera>(null);
@@ -101,7 +104,7 @@ export default function Scene() {
       {mode === 'scene' && !multiview && <EditorFly />}
       {mode === 'scene' && hasCam && <SceneGizmos />}
       {mode === 'scene' && !multiview && <CameraMarkers />}
-      {mode === 'scene' && !multiview && hasCam && <PoiControl />}
+      {mode === 'scene' && !multiview && hasCam && inspect !== 'light' && <PoiControl />}
       {mode === 'scene' && !multiview && <LightMarkers />}
       {mode === 'scene' && !multiview && <LightInfluence />}
       {mode === 'scene' && !multiview && <LightGizmos />}

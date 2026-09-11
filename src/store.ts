@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import * as THREE from 'three';
 import type { Camera, Channel, Ease, KeySource, Project, Target, Tool, Vec3 } from './types';
 import { clamp, eulerFromLookAt, evaluate, keysOf, poiPoint, round, uid, hasAnim } from './lib/eval';
-import { makeDefaultLights } from './lib/lightRig';
+import { makeLight } from './lib/lightRig';
 
 export type ModalKind = null | 'interp' | 'ai-image' | 'ai-video' | 'ai-review-image' | 'ai-review-video' | 'export';
 
@@ -42,7 +42,8 @@ interface UI {
   viewMode: ViewMode;
   gizmoDragging: boolean;
   gizmoMode: 'translate' | 'rotate';
-  gizmoSpace: 'world' | 'local';
+  gizmoSpace: 'world' | 'local';       // camera gizmo orientation frame
+  gizmoSpaceLight: 'world' | 'local';  // light gizmo orientation frame (independent of the camera's)
   inspect: 'camera' | 'light';
   focusPicking: boolean;
   targetSelected: boolean;
@@ -125,13 +126,20 @@ interface StoreState {
   setGizmoDragging: (b: boolean) => void;
   setGizmoMode: (m: 'translate' | 'rotate') => void;
   setGizmoSpace: (s: 'world' | 'local') => void;
+  toggleGizmoSpace: () => void;
 }
 
 export const useStore = create<StoreState>((set, get) => {
-  const initial = makeCamera('Camera 01');
+  // Start with NO cameras and ONLY a single environment light — enough fill that the scene isn't
+  // pitch-black, but the user still composes lights + cameras by hand (+ New camera / + Spot…).
+  // The env light is an image-based environment (IBL, drei <Environment>): no position, no gizmo,
+  // nothing to accidentally move. Lights added later are born FREE (target null), never auto-locked
+  // onto the asset; the Target tool is how you aim/lock a light. Default view is Scene (there's no
+  // camera yet to look through). active() falls back to FALLBACK_CAM so a cameraless scene never crashes.
+  const env = makeLight('env', 'Environment', { hdri: '/asset/hdri/studio_portrait_classic.exr', hdriName: 'studio_portrait_classic.exr', intensity: 1 });
   const project: Project = {
-    cameras: [initial], lights: makeDefaultLights(),
-    activeCameraId: initial.id, activeLightId: '', fps: 30,
+    cameras: [], lights: [env],
+    activeCameraId: '', activeLightId: '', fps: 30,
     timeline: { duration: 5, playhead: 0, playing: false },
     canvas: { width: 1920, height: 1080 },
   };
@@ -193,7 +201,7 @@ export const useStore = create<StoreState>((set, get) => {
 
   return {
     project, rev: 0,
-    ui: { tool: 'select', inspect: 'camera', selectedKeyIds: [], poseA: null, poseB: null, modal: null, recording: false, toast: '', viewMode: 'camera', gizmoDragging: false, gizmoMode: 'translate', gizmoSpace: 'local', focusPicking: false, targetSelected: false, multiview: false, split: false, motionBlur: false, splineViz: 'none', hidden: {}, interp: null },
+    ui: { tool: 'select', inspect: 'camera', selectedKeyIds: [], poseA: null, poseB: null, modal: null, recording: false, toast: '', viewMode: 'scene', gizmoDragging: false, gizmoMode: 'translate', gizmoSpace: 'local', gizmoSpaceLight: 'local', focusPicking: false, targetSelected: false, multiview: false, split: false, motionBlur: false, splineViz: 'none', hidden: {}, interp: null },
     bump, active, programCameraAt, renderCamera,
     undo: () => {
       if (commitTimer) { clearTimeout(commitTimer); commitTimer = null; }
@@ -213,13 +221,16 @@ export const useStore = create<StoreState>((set, get) => {
     setTool: t => { get().ui.tool = t; bump(); },
     toast: m => { get().ui.toast = m; bump(); setTimeout(() => { if (get().ui.toast === m) { get().ui.toast = ''; bump(); } }, 2600); },
     selectCamera: id => { get().project.activeCameraId = id; get().ui.inspect = 'camera'; get().ui.selectedKeyIds = []; get().ui.targetSelected = false; bump(); },
-    addCamera: () => { const p = get().project; const c = makeCamera('Camera ' + String(p.cameras.length + 1).padStart(2, '0'), undefined, nextColor()); p.cameras.push(c); p.activeCameraId = c.id; bump(); },
+    addCamera: () => { const p = get().project; const c = makeCamera('Camera ' + String(p.cameras.length + 1).padStart(2, '0'), undefined, nextColor()); p.cameras.push(c); p.activeCameraId = c.id; get().ui.inspect = 'camera'; bump(); },
     removeCamera: id => {
       const p = get().project;
       const idx = p.cameras.findIndex(c => c.id === id); if (idx < 0) return;
       p.cameras.splice(idx, 1); // any camera can be removed — the scene may end up with none
       if (p.activeCameraId === id) p.activeCameraId = p.cameras.length ? p.cameras[Math.min(idx, p.cameras.length - 1)].id : '';
       const ui = get().ui; ui.selectedKeyIds = []; ui.targetSelected = false; delete ui.hidden['cam:' + id];
+      // No camera left → there's nothing to look through, so drop back to the Scene view (the Camera/
+      // Split buttons are disabled while empty).
+      if (!p.cameras.length) { ui.viewMode = 'scene'; ui.split = false; ui.inspect = 'camera'; }
       bump();
     },
     setCameraColor: (id, color) => { const c = get().project.cameras.find(c => c.id === id); if (c) { c.color = color; bump(); } },
@@ -376,6 +387,9 @@ export const useStore = create<StoreState>((set, get) => {
     setGizmoDragging: b => { get().ui.gizmoDragging = b; bump(); },
     setGizmoMode: m => { get().ui.gizmoMode = m; bump(); },
     setGizmoSpace: s => { get().ui.gizmoSpace = s; bump(); },
+    // Toggle the orientation frame of whichever gizmo is being edited: light when the light panel is
+    // active, camera otherwise — so the button/R shortcut only affects the selected entity's gizmo.
+    toggleGizmoSpace: () => { const ui = get().ui; if (ui.inspect === 'light') ui.gizmoSpaceLight = ui.gizmoSpaceLight === 'world' ? 'local' : 'world'; else ui.gizmoSpace = ui.gizmoSpace === 'world' ? 'local' : 'world'; bump(); },
   };
 });
 

@@ -37,7 +37,7 @@ export default function LightInfluence() {
   useStore(s => s.rev);
   const st = S();
   const l = st.ui.inspect === 'light' ? activeLight() : null;
-  if (!l || multiview || l.kind === 'ambient') return null;
+  if (!l || multiview || l.kind === 'ambient' || l.kind === 'env') return null;
 
   const t = st.project.timeline.playhead;
   const pose = evalLight(l, t);
