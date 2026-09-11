@@ -89,6 +89,7 @@ interface StoreState {
   setDuration: (d: number) => void;
   setFps: (f: number) => void;
   setCanvas: (w: number, h: number) => void;
+  setBackdrop: (patch: Partial<Project['backdrop']>) => void;
   setOptic: (k: 'focalLength' | 'aperture' | 'motionBlurShutter', v: number) => void;
   toggleKeyAt: (ch: Channel, value: Vec3 | number) => void;
   editPose: (channel: 'position' | 'rotation', i: number, value: number) => void;
@@ -143,6 +144,7 @@ export const useStore = create<StoreState>((set, get) => {
     activeCameraId: '', activeLightId: '', fps: 30,
     timeline: { duration: 5, playhead: 0, playing: false },
     canvas: { width: 1920, height: 1080 },
+    backdrop: { enabled: false, color: '#3b4149' },
   };
   // --- Undo/redo: snapshot the `project` at settle points. Rapid changes (a drag = many bumps)
   // coalesce into ONE step via a short debounce; discrete actions each become a step. ---
@@ -323,6 +325,7 @@ export const useStore = create<StoreState>((set, get) => {
     setDuration: d => { const t = get().project.timeline; t.duration = clamp(Math.round(d * 1000) / 1000, 0.1, 120); if (t.playhead > t.duration) t.playhead = t.duration; bump(); },
     setFps: f => { get().project.fps = clamp(Math.round(f), 1, 120); bump(); },
     setCanvas: (w, h) => { get().project.canvas = { width: w, height: h }; bump(); },
+    setBackdrop: patch => { const p = get().project; p.backdrop = { ...p.backdrop, ...patch }; bump(); },
     setOptic: (k, v) => { active().optics[k] = v; bump(); }, // optics are static per shot (not keyframable)
     toggleKeyAt: (ch, value) => {
       const cam = active(); const t = get().project.timeline.playhead;

@@ -33,20 +33,30 @@ function SceneCamBridge() {
 function ViewBackground() {
   const scene = useThree(s => s.scene);
   const mode = useStore(s => s.ui.viewMode);
+  const bd = useStore(s => s.project.backdrop);
   useEffect(() => {
-    const col = mode === 'camera' ? 0x1a1e22 : 0x2c2f34;
+    // In the Camera view (final look), a backdrop makes the background match the ground colour so the
+    // visible floor blends into a seamless "infinity" sweep. The Scene editor keeps its neutral gray.
+    const camCol = bd.enabled ? new THREE.Color(bd.color).getHex() : 0x1a1e22;
+    const col = mode === 'camera' ? camCol : 0x2c2f34;
     scene.background = new THREE.Color(col);
     scene.fog = new THREE.Fog(col, 22, mode === 'camera' ? 48 : 65);
-  }, [mode, scene]);
+  }, [mode, scene, bd.enabled, bd.color]);
   return null;
 }
 // Ground is viewport furniture (not a scene object). It's a pure SHADOW CATCHER: a transparent
 // ShadowMaterial that shows ONLY cast shadows, never the disc itself — so the bright environment
 // (IBL) doesn't light up a visible floor disc behind the product. Still raycastable for focus picking.
 function Floor() {
+  useStore(s => s.rev);
+  const bd = S().project.backdrop;
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow userData={{ focusPickable: true }}>
-      <circleGeometry args={[26, 64]} /><shadowMaterial transparent opacity={0.35} />
+      <circleGeometry args={[26, 64]} />
+      {/* Backdrop ON → a visible ground (product no longer floats); OFF → a pure shadow catcher. */}
+      {bd.enabled
+        ? <meshStandardMaterial color={bd.color} roughness={0.95} metalness={0} />
+        : <shadowMaterial transparent opacity={0.35} />}
     </mesh>
   );
 }

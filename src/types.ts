@@ -89,4 +89,7 @@ export interface Project {
   fps: number;
   timeline: { duration: number; playhead: number; playing: boolean };
   canvas: { width: number; height: number };
+  // Optional studio backdrop: a visible ground that blends into a matching background (seamless
+  // "infinity" sweep) so the product + pedestal don't float. Off by default (kept the clean seamless look).
+  backdrop: { enabled: boolean; color: string };
 }

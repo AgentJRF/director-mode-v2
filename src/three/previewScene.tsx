@@ -1,10 +1,31 @@
 import { Canvas, useThree, useFrame } from '@react-three/fiber';
-import { Suspense, useMemo, type ReactNode } from 'react';
+import { Suspense, useEffect, useMemo, type ReactNode } from 'react';
 import * as THREE from 'three';
 import { useGLTF } from '@react-three/drei';
-import { S } from '../store';
+import { S, useStore } from '../store';
 import { clamp, evaluate } from '../lib/eval';
 import SceneLights from './SceneLights';
+
+// Background + floor mirror the main scene's backdrop so the split preview matches the Camera view.
+function PreviewBg() {
+  const scene = useThree(s => s.scene);
+  const bd = useStore(s => s.project.backdrop);
+  useEffect(() => {
+    const col = bd.enabled ? new THREE.Color(bd.color).getHex() : 0x1a1e22;
+    scene.background = new THREE.Color(col);
+    scene.fog = new THREE.Fog(col, 22, 48);
+  }, [scene, bd.enabled, bd.color]);
+  return null;
+}
+function PreviewFloor() {
+  const bd = useStore(s => s.project.backdrop);
+  return (
+    <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <circleGeometry args={[26, 64]} />
+      {bd.enabled ? <meshStandardMaterial color={bd.color} roughness={0.95} metalness={0} /> : <shadowMaterial transparent opacity={0.35} />}
+    </mesh>
+  );
+}
 
 const URL = '/asset/Outdoor_Bag_Blue_orange_V03.glb';
 
@@ -43,10 +64,9 @@ export function StudioCanvas({ children }: { children: ReactNode }) {
       onCreated={({ scene, gl }) => { scene.background = new THREE.Color(0x1a1e22); scene.fog = new THREE.Fog(0x1a1e22, 22, 48); gl.toneMappingExposure = 1.25; }}>
       {/* Same lights/IBL as the main scene (SceneLights reads the store) so the split preview matches
           the Camera view. Floor is a shadow catcher (no visible disc), mirroring the main scene. */}
+      <PreviewBg />
       <SceneLights />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[26, 64]} /><shadowMaterial transparent opacity={0.35} />
-      </mesh>
+      <PreviewFloor />
       <Suspense fallback={null}><Model /></Suspense>
       {children}
     </Canvas>
