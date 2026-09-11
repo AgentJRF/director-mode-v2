@@ -14,7 +14,8 @@ export function makeLight(kind: LightKind, name: string, over: Partial<Light> = 
     base.angle = 0.6; base.penumbra = 0.5; base.distance = 0; base.decay = 1.2; base.castShadow = true;
   }
   if (kind === 'point') { base.distance = 40; base.decay = 1.2; }
-  if (kind === 'area') { base.width = 3; base.height = 3; base.intensity = 5; }
+  if (kind === 'directional') base.castShadow = true;
+  if (kind === 'area') { base.width = 3; base.height = 3; base.intensity = 5; base.castShadow = true; }
   if (kind === 'env') { base.envRotation = 0; base.colorize = false; } // image-based environment (IBL)
   return { ...base, ...over };
 }

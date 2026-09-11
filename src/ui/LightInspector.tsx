@@ -141,7 +141,7 @@ export default function LightInspector() {
         {isSpot && <Slider label="Softness" value={l.penumbra ?? 0.5} min={0} max={1} step={0.05} onChange={setLightPenumbra} />}
         {isArea && <Slider label="Width" value={l.width ?? 4} min={0.1} max={20} step={0.1} onChange={setLightWidth} />}
         {isArea && <Slider label="Height" value={l.height ?? 2} min={0.1} max={20} step={0.1} onChange={setLightHeight} />}
-        {(isSpot || isDir) && (
+        {(isSpot || isDir || isArea) && (
           <div className="row">
             <span className="row-lead"><span className="kf-spacer" /><label>Shadow</label></span>
             <button className={'btn-sm' + (l.castShadow ? ' amber' : '')} onClick={() => setLightCastShadow(!l.castShadow)}>{l.castShadow ? 'On' : 'Off'}</button>

@@ -17,8 +17,12 @@ RectAreaLightUniformsLib.init();
 // the playhead without re-rendering React). Structural props (kind) come from the store on re-render.
 function LightNode({ light }: { light: Light }) {
   const ref = useRef<any>(null);
-  // Persistent aim target for spot/directional. Kept in the scene graph via <primitive> so its
-  // matrixWorld updates; only assigned as the light's target when the light actually aims.
+  // A RectAreaLight can't cast shadows in three.js, so an area light gets a co-located shadow-only
+  // SpotLight proxy (near-zero intensity — the ShadowMaterial catcher shows the shadow regardless of
+  // intensity, so it adds no visible light but does cast the shadow).
+  const shadowRef = useRef<any>(null);
+  // Persistent aim target for spot/directional (and the area shadow proxy). Kept in the scene graph via
+  // <primitive> so its matrixWorld updates; only assigned as a light's target when it actually aims.
   const target = useMemo(() => new THREE.Object3D(), []);
 
   useFrame(() => {
@@ -34,17 +38,21 @@ function LightNode({ light }: { light: Light }) {
     if (l.kind === 'spot' || l.kind === 'directional' || l.kind === 'point' || l.kind === 'area') {
       o.position.set(pose.position[0], pose.position[1], pose.position[2]);
     }
-    if (l.kind === 'spot' || l.kind === 'directional') {
+    if (l.kind === 'spot' || l.kind === 'directional' || l.kind === 'area') {
       const aim = lightPoi(l, t);
       target.position.set(aim[0], aim[1], aim[2]);
       target.updateMatrixWorld();
-      o.target = target;
+      if (l.kind !== 'area') o.target = target;
     }
+    if (l.kind === 'directional') o.castShadow = !!l.castShadow;
     if (l.kind === 'area') {
       const s = o as THREE.RectAreaLight;
       s.width = l.width ?? 4; s.height = l.height ?? 2;
       const aim = lightPoi(l, t);
       o.lookAt(aim[0], aim[1], aim[2]); // RectAreaLight aims via its own orientation (no .target)
+      // Drive the shadow-only proxy: sit at the light, aim at the POI, cast when the light casts.
+      const sp = shadowRef.current;
+      if (sp) { sp.position.set(pose.position[0], pose.position[1], pose.position[2]); sp.target = target; sp.castShadow = !!l.castShadow; }
     }
     if (l.kind === 'spot') {
       const s = o as THREE.SpotLight;
@@ -65,11 +73,22 @@ function LightNode({ light }: { light: Light }) {
       return <pointLight ref={ref} position={pos} intensity={light.intensity} color={light.color}
         distance={light.distance ?? 0} decay={light.decay ?? 1.2} />;
     case 'area':
-      return <rectAreaLight ref={ref} position={pos} intensity={light.intensity} color={light.color}
-        width={light.width ?? 4} height={light.height ?? 2} />;
+      return (<>
+        <rectAreaLight ref={ref} position={pos} intensity={light.intensity} color={light.color}
+          width={light.width ?? 4} height={light.height ?? 2} />
+        {/* Shadow-only proxy (RectAreaLight can't cast). Near-zero intensity adds no visible light,
+            but the ShadowMaterial catcher shows its shadow. */}
+        <spotLight ref={shadowRef} position={pos} intensity={0.0001} angle={1.1} penumbra={1} distance={0}
+          castShadow={!!light.castShadow} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0003}
+          shadow-normalBias={0.03} shadow-camera-near={0.5} shadow-camera-far={60} />
+        <primitive object={target} />
+      </>);
     case 'directional':
       return (<>
-        <directionalLight ref={ref} position={pos} intensity={light.intensity} color={light.color} />
+        <directionalLight ref={ref} position={pos} intensity={light.intensity} color={light.color}
+          castShadow={!!light.castShadow} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0003} shadow-normalBias={0.03}
+          shadow-camera-near={0.5} shadow-camera-far={80}
+          shadow-camera-left={-10} shadow-camera-right={10} shadow-camera-top={10} shadow-camera-bottom={-10} />
         <primitive object={target} />
       </>);
     case 'spot':
