@@ -44,7 +44,7 @@ export function addLight(kind: LightKind = 'spot') {
   // origin by default; use the Target ("lock") tool to lock a light onto an asset.
   const over =
     kind === 'spot'
-      ? { color: '#ffffff', intensity: 3, transform: { position: [4, 6, 4] as Vec3, rotation: [0, 0, 0] as Vec3 }, distance: 20 }
+      ? { color: '#ffffff', intensity: 3, transform: { position: [4, 6, 4] as Vec3, rotation: [0, 0, 0] as Vec3 }, distance: 0 }
       : kind === 'directional'
         ? { color: '#ffffff', intensity: 1, transform: { position: [5, 6, 4] as Vec3, rotation: [0, 0, 0] as Vec3 } }
         : kind === 'area'

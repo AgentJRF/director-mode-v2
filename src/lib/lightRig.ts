@@ -10,7 +10,8 @@ export function makeLight(kind: LightKind, name: string, over: Partial<Light> = 
     target: null, keyframes: [],
   };
   if (kind === 'spot') {
-    base.angle = 0.6; base.penumbra = 0.5; base.distance = 40; base.decay = 1.2; base.castShadow = true;
+    // distance 0 = unlimited (decay attenuates) so the shadow-map far plane isn't clipped — see SceneLights.
+    base.angle = 0.6; base.penumbra = 0.5; base.distance = 0; base.decay = 1.2; base.castShadow = true;
   }
   if (kind === 'point') { base.distance = 40; base.decay = 1.2; }
   if (kind === 'area') { base.width = 3; base.height = 3; base.intensity = 5; }
@@ -29,7 +30,7 @@ export function makeDefaultLights(): Light[] {
     makeLight('spot', 'Key', {
       color: '#fff4e6', intensity: 4.6,
       transform: { position: [6, 9, 6], rotation: [0, 0, 0] },
-      angle: 0.85, penumbra: 0.5, distance: 40, decay: 1.2, castShadow: true,
+      angle: 0.85, penumbra: 0.5, distance: 0, decay: 1.2, castShadow: true,
     }),
     makeLight('directional', 'Fill', {
       color: '#9fb4cc', intensity: 0.8, transform: { position: [-7, 4, -3], rotation: [0, 0, 0] },

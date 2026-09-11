@@ -74,10 +74,15 @@ function LightNode({ light }: { light: Light }) {
       </>);
     case 'spot':
       return (<>
+        {/* distance 0 = unlimited range (decay still attenuates). three ties the shadow-map far plane
+            to `distance` (far = distance || camera.far); a short distance was CLIPPING the cast shadow
+            when the light moved. With distance 0, far uses our fixed shadow-camera-far, which covers the
+            whole scene so the shadow never gets cut, while staying tight enough for good depth precision. */}
         <spotLight ref={ref} position={pos} intensity={light.intensity} color={light.color}
           angle={light.angle ?? 0.6} penumbra={light.penumbra ?? 0.5}
-          distance={light.distance ?? 40} decay={light.decay ?? 1.2}
-          castShadow={!!light.castShadow} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0003} />
+          distance={light.distance ?? 0} decay={light.decay ?? 1.2}
+          castShadow={!!light.castShadow} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0003}
+          shadow-normalBias={0.03} shadow-camera-near={0.5} shadow-camera-far={60} />
         <primitive object={target} />
       </>);
     default:
