@@ -136,7 +136,7 @@ export const useStore = create<StoreState>((set, get) => {
   // nothing to accidentally move. Lights added later are born FREE (target null), never auto-locked
   // onto the asset; the Target tool is how you aim/lock a light. Default view is Scene (there's no
   // camera yet to look through). active() falls back to FALLBACK_CAM so a cameraless scene never crashes.
-  const env = makeLight('env', 'Environment', { hdri: '/asset/hdri/studio_portrait_classic.exr', hdriName: 'studio_portrait_classic.exr', intensity: 1 });
+  const env = makeLight('env', 'Environment', { hdri: '/asset/hdri/studio_portrait_classic_2k.hdr', hdriName: 'studio_portrait_classic_2k.hdr', intensity: 1 });
   const project: Project = {
     cameras: [], lights: [env],
     activeCameraId: '', activeLightId: '', fps: 30,

@@ -4,7 +4,7 @@ import { evalLight, lightPoi } from '../lib/lightEval';
 import {
   activeLight, lightKeysOf, removeLight, duplicateLight, lightKindLabel,
   setLightColor, setLightGroundColor, setLightAngle, setLightPenumbra, setLightCastShadow,
-  setLightWidth, setLightHeight, clearLightTarget, setLightEnvRotation, setLightHdri,
+  setLightWidth, setLightHeight, clearLightTarget, setLightEnvRotation, setLightHdri, setLightColorize,
   editLightIntensity, editLightPos, editLightPoi, toggleLightKey,
 } from '../lib/lights';
 import { round } from '../lib/eval';
@@ -94,6 +94,14 @@ export default function LightInspector() {
           {/* Stager shows intensity as a percentage; 100% = environmentIntensity 1.0. */}
           <Slider label="Intensity" value={Math.round(l.intensity * 100)} min={0} max={400} step={1} unit="%" onChange={pct => editLightIntensity(pct / 100)} />
           <Slider label="Rotation" value={Math.round(l.envRotation ?? 0)} min={0} max={360} step={1} unit="°" onChange={setLightEnvRotation} />
+          <div className="row">
+            <span className="row-lead"><span className="kf-spacer" /><label>Colorize</label></span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <input type="checkbox" checked={!!l.colorize} onChange={e => setLightColorize(e.target.checked)} title="Tint the environment by a colour" />
+              <input type="color" value={l.color} disabled={!l.colorize} onChange={e => setLightColor(e.target.value)}
+                style={{ width: 34, height: 22, padding: 0, border: '1px solid var(--line-2)', borderRadius: 4, background: 'none', cursor: l.colorize ? 'pointer' : 'not-allowed', opacity: l.colorize ? 1 : 0.4 }} />
+            </span>
+          </div>
         </div>
       )}
 

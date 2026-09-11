@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
@@ -87,32 +87,68 @@ function LightNode({ light }: { light: Light }) {
 
 const hdriExt = (s: string) => { const m = /\.([a-z0-9]+)(?:\?|#|$)/i.exec(s); return (m ? m[1] : '').toLowerCase(); };
 
+// Render the equirect flat into an equirect-mapped HalfFloat RT, multiplied by `colorHex` (Colorize).
+// HalfFloat + NoToneMapping keep the HDR range intact so the PMREM built from it still lights correctly.
+function tintEquirect(gl: THREE.WebGLRenderer, tex: THREE.Texture, colorHex: string): THREE.WebGLRenderTarget {
+  const W = tex.image.width, H = tex.image.height;
+  const rt = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType });
+  const scene = new THREE.Scene();
+  const cam = new THREE.OrthographicCamera(-1, 1, 0.5, -0.5, 0, 1);
+  const prevMapping = tex.mapping; tex.mapping = THREE.UVMapping; tex.needsUpdate = true;
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 1),
+    new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(colorHex), toneMapped: false }));
+  scene.add(mesh);
+  const prevRT = gl.getRenderTarget(), prevTone = gl.toneMapping;
+  gl.toneMapping = THREE.NoToneMapping;
+  gl.setRenderTarget(rt); gl.clear(); gl.render(scene, cam);
+  gl.setRenderTarget(prevRT); gl.toneMapping = prevTone;
+  tex.mapping = prevMapping; tex.needsUpdate = true;
+  mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose();
+  rt.texture.mapping = THREE.EquirectangularReflectionMapping;
+  return rt;
+}
+
 // Image-based environment light (IBL). Loads the equirect HDRI with the loader matching its extension
 // (.exr → EXRLoader, else RGBELoader for .hdr), PMREMs it, and drives scene.environment. We load it
 // ourselves (rather than drei's <Environment>) so a runtime object URL from a file pick — which has no
-// extension — still works, using `hdriName` to pick the loader. Intensity + Y rotation are cheap live
-// writes each frame (no PMREM rebuild). Hidden via the eye toggle (SceneLights unmounts this).
+// extension — still works, using `hdriName` to pick the loader.
+//   • Effect A loads the equirect ONCE per url (kept in a ref) — colour/colorize changes never re-fetch.
+//   • Effect B (re)builds the PMREM, tinting the source when Colorize is on.
+//   • Intensity + Y rotation are cheap live writes each frame. Hidden via the eye toggle (unmounted).
 function EnvNode({ light }: { light: Light }) {
   const { gl, scene } = useThree();
   const url = light.hdri;
   const ext = hdriExt(light.hdriName || url || '');
+  const texRef = useRef<THREE.Texture | null>(null);
+  const [loaded, setLoaded] = useState(0); // ticks when a new equirect finishes loading
+
+  // A — load the raw equirect once per source.
   useEffect(() => {
+    texRef.current = null;
     if (!url) { scene.environment = null; return; }
     let cancelled = false;
-    let rt: THREE.WebGLRenderTarget | null = null;
-    const pmrem = new THREE.PMREMGenerator(gl);
     const Loader = ext === 'exr' ? EXRLoader : RGBELoader;
     new Loader().load(url, tex => {
-      if (cancelled) { tex.dispose(); pmrem.dispose(); return; }
-      // One-time flat thumbnail for the inspector (before the equirect mapping is set for PMREM).
-      if (!hdriThumbs.has(url)) { try { makeHdriThumb(gl, tex, url); S().bump(); } catch { /* preview is optional */ } }
+      if (cancelled) { tex.dispose(); return; }
+      if (!hdriThumbs.has(url)) { try { makeHdriThumb(gl, tex, url); S().bump(); } catch { /* preview optional */ } }
       tex.mapping = THREE.EquirectangularReflectionMapping;
-      rt = pmrem.fromEquirectangular(tex);
-      scene.environment = rt.texture;
-      tex.dispose(); pmrem.dispose();
-    }, undefined, () => pmrem.dispose());
-    return () => { cancelled = true; scene.environment = null; rt?.dispose(); };
+      texRef.current = tex;
+      setLoaded(n => n + 1);
+    });
+    return () => { cancelled = true; scene.environment = null; texRef.current?.dispose(); texRef.current = null; };
   }, [gl, scene, url, ext]);
+
+  // B — build the PMREM (retinting when Colorize / colour change) without re-fetching.
+  useEffect(() => {
+    const tex = texRef.current; if (!tex) return;
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const tinted = light.colorize ? tintEquirect(gl, tex, light.color) : null;
+    const rt = pmrem.fromEquirectangular(tinted ? tinted.texture : tex);
+    scene.environment = rt.texture;
+    pmrem.dispose(); tinted?.dispose();
+    return () => { scene.environment = null; rt.dispose(); };
+  }, [gl, scene, loaded, light.colorize, light.color]);
+
   useFrame(() => {
     scene.environmentIntensity = light.intensity;
     scene.environmentRotation.set(0, THREE.MathUtils.degToRad(light.envRotation ?? 0), 0);
