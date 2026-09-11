@@ -19,11 +19,18 @@ function PreviewBg() {
 }
 function PreviewFloor() {
   const bd = useStore(s => s.project.backdrop);
+  const r = bd.enabled ? 400 : 26;
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-      <circleGeometry args={[bd.enabled ? 400 : 26, 64]} />
-      {bd.enabled ? <meshStandardMaterial color={bd.color} roughness={0.95} metalness={0} /> : <shadowMaterial transparent opacity={0.35} />}
-    </mesh>
+    <group>
+      {bd.enabled && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <circleGeometry args={[r, 64]} /><meshStandardMaterial color={bd.color} roughness={0.95} metalness={0} />
+        </mesh>
+      )}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, bd.enabled ? 0.004 : 0, 0]} receiveShadow>
+        <circleGeometry args={[r, 64]} /><shadowMaterial transparent opacity={0.4} depthWrite={false} />
+      </mesh>
+    </group>
   );
 }
 

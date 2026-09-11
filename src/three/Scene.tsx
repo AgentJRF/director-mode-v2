@@ -49,15 +49,22 @@ function ViewBackground() {
 function Floor() {
   useStore(s => s.rev);
   const bd = S().project.backdrop;
+  const r = bd.enabled ? 400 : 26;
+  // A ShadowMaterial catcher is ALWAYS present so cast shadows read even under strong IBL (a lit
+  // standard material would let the IBL wash the shadow out). With Background on we add a large lit
+  // ground of the chosen colour BENEATH it (fog-blended → seamless studio); the catcher sits a hair
+  // above to darken only where shadows fall.
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow userData={{ focusPickable: true }}>
-      {/* Background ON → a large lit ground that fades (via fog) into the matching background, so it
-          reads as a seamless studio (not an object) while catching shadows + light. OFF → shadow catcher. */}
-      <circleGeometry args={[bd.enabled ? 400 : 26, 64]} />
-      {bd.enabled
-        ? <meshStandardMaterial color={bd.color} roughness={0.95} metalness={0} />
-        : <shadowMaterial transparent opacity={0.35} />}
-    </mesh>
+    <group>
+      {bd.enabled && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+          <circleGeometry args={[r, 64]} /><meshStandardMaterial color={bd.color} roughness={0.95} metalness={0} />
+        </mesh>
+      )}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, bd.enabled ? 0.004 : 0, 0]} receiveShadow userData={{ focusPickable: true }}>
+        <circleGeometry args={[r, 64]} /><shadowMaterial transparent opacity={0.4} depthWrite={false} />
+      </mesh>
+    </group>
   );
 }
 // Dimension/Stager-style ground grid: an INFINITE shader grid (single quad, ~free — not real geometry),
