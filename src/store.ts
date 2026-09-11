@@ -234,7 +234,12 @@ export const useStore = create<StoreState>((set, get) => {
         const e = new THREE.Euler().setFromQuaternion(sc.quaternion, 'YXZ');
         const r2d = THREE.MathUtils.radToDeg;
         c.transform.rotation = [round(r2d(e.x), 2), round(r2d(e.y), 2), round(r2d(e.z), 2)];
-        c.optics.focalLength = Math.round(36 / (2 * Math.tan(THREE.MathUtils.degToRad(sc.fov) / 2))); // fov -> focal (36mm gauge)
+        // Match the shot to the WHOLE viewport frame. three fov is vertical, and the render camera uses
+        // the project (16:9) aspect with filmHeight = 36/aspect — so we widen the vertical fov by the
+        // viewport-vs-render aspect ratio (max 1) so everything visible in the Scene view is contained.
+        const Ar = Math.max(p.canvas.width / p.canvas.height, 1e-3);
+        const halfV = Math.tan(THREE.MathUtils.degToRad(sc.fov) / 2) * Math.max(1, sc.aspect / Ar);
+        c.optics.focalLength = clamp(Math.round((36 / Math.max(Ar, 1)) / (2 * halfV)), 14, 200);
       }
       p.cameras.push(c); p.activeCameraId = c.id; get().ui.inspect = 'camera'; bump();
     },
