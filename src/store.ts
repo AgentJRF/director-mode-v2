@@ -230,16 +230,22 @@ export const useStore = create<StoreState>((set, get) => {
       // scene camera isn't mounted yet.
       const sc = R3.sceneCam;
       if (sc) {
-        c.transform.position = [round(sc.position.x, 3), round(sc.position.y, 3), round(sc.position.z, 3)];
-        const e = new THREE.Euler().setFromQuaternion(sc.quaternion, 'YXZ');
+        // Capture the Scene viewpoint, but keep a natural 35mm lens (not a computed wide focal): keep
+        // the look direction and DOLLY the camera along its view axis so the product stays framed the
+        // same size as the viewport at 35mm (photographer workflow — pick the lens, then dolly to frame).
+        const q = sc.quaternion;
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(q).normalize();
+        const focal = 35;
+        const Ar = Math.max(p.canvas.width / p.canvas.height, 1e-3);
+        const halfVp = Math.tan(THREE.MathUtils.degToRad(sc.fov) / 2) * Math.max(1, sc.aspect / Ar); // viewport vertical half-extent (contain whole frame)
+        const half35 = (36 / Math.max(Ar, 1)) / (2 * focal);                                        // 35mm vertical half-extent at render aspect
+        const t = Math.max(0.1, PIVOT.clone().sub(sc.position).dot(forward));                        // view-ray distance to the product
+        const pos = sc.position.clone().addScaledVector(forward, t * (1 - halfVp / half35));         // dolly to preserve framing
+        c.transform.position = [round(pos.x, 3), round(pos.y, 3), round(pos.z, 3)];
+        const e = new THREE.Euler().setFromQuaternion(q, 'YXZ');
         const r2d = THREE.MathUtils.radToDeg;
         c.transform.rotation = [round(r2d(e.x), 2), round(r2d(e.y), 2), round(r2d(e.z), 2)];
-        // Match the shot to the WHOLE viewport frame. three fov is vertical, and the render camera uses
-        // the project (16:9) aspect with filmHeight = 36/aspect — so we widen the vertical fov by the
-        // viewport-vs-render aspect ratio (max 1) so everything visible in the Scene view is contained.
-        const Ar = Math.max(p.canvas.width / p.canvas.height, 1e-3);
-        const halfV = Math.tan(THREE.MathUtils.degToRad(sc.fov) / 2) * Math.max(1, sc.aspect / Ar);
-        c.optics.focalLength = clamp(Math.round((36 / Math.max(Ar, 1)) / (2 * halfV)), 14, 200);
+        c.optics.focalLength = focal;
       }
       p.cameras.push(c); p.activeCameraId = c.id; get().ui.inspect = 'camera'; bump();
     },
