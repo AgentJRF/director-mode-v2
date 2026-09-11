@@ -87,7 +87,7 @@ export default function Scene() {
     <Canvas shadows dpr={[1, 2]} gl={{ preserveDrawingBuffer: true, antialias: true }}
       onCreated={({ scene, gl }) => { scene.background = new THREE.Color(0x1a1e22); scene.fog = new THREE.Fog(0x1a1e22, 22, 48); gl.toneMappingExposure = 1.25; }}>
       <PerspectiveCamera ref={renderCamRef} makeDefault={mode === 'camera'} fov={45} near={0.1} far={200} position={[4, 2.2, 5]} />
-      <PerspectiveCamera ref={sceneCamRef} makeDefault={mode === 'scene'} fov={50} near={0.1} far={500} position={[8, 5, 9]} />
+      <PerspectiveCamera ref={sceneCamRef} makeDefault={mode === 'scene'} fov={50} near={0.1} far={500} position={[2.9, 1.95, 4.4]} />
       <ViewBackground />
       <SceneLights />
       <Floor />
