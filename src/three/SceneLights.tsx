@@ -8,6 +8,7 @@ import { S, useStore } from '../store';
 import { evalLight, lightPoi } from '../lib/lightEval';
 import { lightHideKey } from '../lib/lightRig';
 import { hdriThumbs, makeHdriThumb } from '../lib/hdriThumb';
+import { goboCanvasTexture, goboImageTexture } from '../lib/gobo';
 import type { Light } from '../types';
 
 // RectAreaLight needs its BRDF lookup tables initialised once before any area light renders.
@@ -24,6 +25,21 @@ function LightNode({ light }: { light: Light }) {
   // Persistent aim target for spot/directional (and the area shadow proxy). Kept in the scene graph via
   // <primitive> so its matrixWorld updates; only assigned as a light's target when it actually aims.
   const target = useMemo(() => new THREE.Object3D(), []);
+  // Gobo cookie for spots: derived from the gobo params (rebuilt only when they change) and passed as the
+  // <spotLight map> prop so three wires it up AND recompiles the affected materials (setting light.map
+  // imperatively in useFrame doesn't trigger the recompile, esp. under a demand frameloop). size/rotation
+  // are cheap live writes on the texture transform, done each frame in useFrame.
+  const goboMap = useMemo(() => {
+    const g = light.gobo;
+    if (light.kind !== 'spot' || !g || !g.enabled) return null;
+    if (g.pattern === 'custom') return g.customUrl ? goboImageTexture(g.customUrl, () => S().bump()) : null;
+    return goboCanvasTexture(g);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [light.kind, light.gobo?.enabled, light.gobo?.pattern, light.gobo?.sharpness, light.gobo?.contrast, light.gobo?.customUrl]);
+  useEffect(() => {
+    const owned = !!goboMap && light.gobo?.pattern !== 'custom'; // procedural textures are ours to dispose
+    return () => { if (owned) goboMap!.dispose(); };
+  }, [goboMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useFrame(() => {
     const l = S().project.lights.find(x => x.id === light.id);
@@ -59,6 +75,14 @@ function LightNode({ light }: { light: Light }) {
       s.angle = l.angle ?? 0.6; s.penumbra = l.penumbra ?? 0.5;
       s.distance = l.distance ?? 0; s.decay = l.decay ?? 1.2;
       s.castShadow = !!l.castShadow;
+      // Gobo transform (the map itself is the <spotLight map> prop): live size + rotation.
+      const g = l.gobo;
+      if (g && g.enabled && s.map) {
+        s.map.center.set(0.5, 0.5);
+        s.map.rotation = (g.rotation || 0) * Math.PI / 180;
+        const rep = 1 / Math.max(0.1, g.size || 1);
+        s.map.repeat.set(rep, rep);
+      }
     }
   });
 
@@ -99,7 +123,7 @@ function LightNode({ light }: { light: Light }) {
             whole scene so the shadow never gets cut, while staying tight enough for good depth precision. */}
         <spotLight ref={ref} position={pos} intensity={light.intensity} color={light.color}
           angle={light.angle ?? 0.6} penumbra={light.penumbra ?? 0.5}
-          distance={light.distance ?? 0} decay={light.decay ?? 1.2}
+          distance={light.distance ?? 0} decay={light.decay ?? 1.2} map={goboMap ?? undefined}
           castShadow={!!light.castShadow} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0003}
           shadow-normalBias={0.03} shadow-camera-near={0.5} shadow-camera-far={60} />
         <primitive object={target} />

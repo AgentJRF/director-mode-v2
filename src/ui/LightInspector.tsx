@@ -5,7 +5,7 @@ import {
   activeLight, lightKeysOf, removeLight, duplicateLight, lightKindLabel,
   setLightColor, setLightGroundColor, setLightAngle, setLightPenumbra, setLightCastShadow,
   setLightWidth, setLightHeight, clearLightTarget, setLightEnvRotation, setLightHdri, setLightColorize,
-  editLightIntensity, editLightPos, editLightPoi, toggleLightKey,
+  editLightIntensity, editLightPos, editLightPoi, toggleLightKey, setLightGobo,
 } from '../lib/lights';
 import { round } from '../lib/eval';
 import { hdriThumbs } from '../lib/hdriThumb';
@@ -148,6 +148,24 @@ export default function LightInspector() {
           </div>
         )}
       </div>
+
+      {isSpot && (
+        <div className="sect">
+          <div className="sect-t" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Gobo</span>
+            <button className={'btn-sm' + (l.gobo?.enabled ? ' amber' : '')} title="Project a patterned cookie through this spot"
+              onClick={() => setLightGobo({ enabled: !l.gobo?.enabled })}>{l.gobo?.enabled ? 'On' : 'Off'}</button>
+          </div>
+          {l.gobo?.enabled && (<>
+            <div className="row"><span className="row-lead"><span className="kf-spacer" /><label>Pattern</label></span>
+              <span className="val" style={{ textTransform: 'capitalize' }}>{l.gobo.customName ? l.gobo.customName.slice(0, 16) : l.gobo.pattern}</span></div>
+            <Slider label="Scale" value={l.gobo.size} min={0.25} max={4} step={0.05} onChange={v => setLightGobo({ size: v })} />
+            <Slider label="Rotation" value={Math.round(l.gobo.rotation)} min={0} max={360} step={1} unit="°" onChange={v => setLightGobo({ rotation: v })} />
+            <Slider label="Softness" value={round(1 - l.gobo.sharpness, 2)} min={0} max={1} step={0.05} onChange={v => setLightGobo({ sharpness: 1 - v })} />
+            <Slider label="Contrast" value={l.gobo.contrast} min={0} max={1} step={0.05} onChange={v => setLightGobo({ contrast: v })} />
+          </>)}
+        </div>
+      )}
 
       {positional && (
         <div className="sect">

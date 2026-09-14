@@ -45,12 +45,18 @@ export interface Camera {
 // ───────────────────────────────────────────────────────────────────────────
 export type LightKind = 'spot' | 'directional' | 'point' | 'ambient' | 'hemisphere' | 'area' | 'env';
 
-// Physical occluder projected by a spot (the auto-lighting "gobo").
+// A gobo / light cookie: a grayscale mask projected by a SPOT (three's SpotLight.map). White passes
+// light, dark blocks it — so the spot throws a pattern (blinds, window, foliage…) onto the scene.
+export type GoboPattern = 'blinds' | 'window' | 'slats' | 'grid' | 'dots' | 'dappled' | 'custom';
 export interface LightGobo {
   enabled: boolean;
-  sharpness: number;            // shadow edge hardness
-  size: number;                 // occluder scale multiplier
-  rotation: number;             // spin around the light→target axis (radians)
+  pattern: GoboPattern;         // which projected cookie
+  size: number;                 // feature scale (higher = larger features / fewer repeats)
+  rotation: number;             // spin of the pattern, degrees
+  sharpness: number;            // 0..1 edge crispness (1 = crisp, 0 = very soft)
+  contrast: number;             // 0..1 how dark the blocked areas get (1 = full black)
+  customUrl?: string;           // uploaded gobo image (object URL / path) when pattern === 'custom'
+  customName?: string;          // original filename for display
 }
 
 export interface Light {

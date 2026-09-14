@@ -1,6 +1,7 @@
-import type { Light, LightKind, Channel, Ease, Keyframe, KeySource, Vec3 } from '../types';
+import type { Light, LightKind, Channel, Ease, Keyframe, KeySource, Vec3, LightGobo, GoboPattern } from '../types';
 import { S } from '../store';
 import { makeLight, lightHideKey } from './lightRig';
+import { defaultGobo } from './gobo';
 import { evalLight, lightPoi } from './lightEval';
 import { uid, round, clamp } from './eval';
 
@@ -94,6 +95,33 @@ export const setLightDistance = (v: number) => withLight(l => { l.distance = Mat
 export const setLightWidth = (v: number) => withLight(l => { l.width = Math.max(0.05, v); });
 export const setLightHeight = (v: number) => withLight(l => { l.height = Math.max(0.05, v); });
 export const setLightCastShadow = (b: boolean) => withLight(l => { l.castShadow = b; });
+// Gobo / projected cookie (spots only). Merges a patch into the light's gobo, seeding defaults on first use.
+export const setLightGobo = (patch: Partial<LightGobo>) => withLight(l => { l.gobo = { ...(l.gobo ?? defaultGobo()), ...patch }; });
+
+// Which spot a gobo picked from the gallery applies to: the selected spot, else the Key, else any spot.
+export function resolveGoboSpot(): Light | null {
+  const p = S().project;
+  return p.lights.find(l => l.id === p.activeLightId && l.kind === 'spot')
+    ?? p.lights.find(l => l.kind === 'spot' && l.name.toLowerCase().startsWith('key'))
+    ?? p.lights.find(l => l.kind === 'spot') ?? null;
+}
+// Apply a gobo pattern from the gallery to the resolved spot (null = remove/disable). Selects that spot.
+export function applyGobo(pattern: GoboPattern | null) {
+  const st = S(); const l = resolveGoboSpot();
+  if (!l) { st.toast('Add a spot light to use a gobo'); return; }
+  if (pattern === null) { if (l.gobo) l.gobo.enabled = false; }
+  else l.gobo = { ...(l.gobo ?? defaultGobo()), pattern, enabled: true };
+  st.project.activeLightId = l.id; st.ui.inspect = 'light';
+  st.bump(); st.toast(pattern ? `Gobo: ${pattern}` : 'Gobo removed');
+}
+// Apply an uploaded custom gobo image to the resolved spot.
+export function applyGoboCustom(url: string, name: string) {
+  const st = S(); const l = resolveGoboSpot();
+  if (!l) { st.toast('Add a spot light to use a gobo'); return; }
+  l.gobo = { ...(l.gobo ?? defaultGobo()), pattern: 'custom', customUrl: url, customName: name, enabled: true };
+  st.project.activeLightId = l.id; st.ui.inspect = 'light';
+  st.bump();
+}
 // env (IBL) statics
 export const setLightEnvRotation = (deg: number) => withLight(l => { l.envRotation = ((deg % 360) + 360) % 360; });
 export const setLightColorize = (b: boolean) => withLight(l => { l.colorize = b; });
