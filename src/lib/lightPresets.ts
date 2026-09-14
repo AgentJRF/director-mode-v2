@@ -1,5 +1,6 @@
-import type { Light, LightKind, Vec3 } from '../types';
+import type { Light, LightKind, Vec3, LightGobo } from '../types';
 import { makeLight } from './lightRig';
+import { defaultGobo } from './gobo';
 import { OBJECT_FRAME } from './eval';
 import { S, PIVOT } from '../store';
 
@@ -11,7 +12,7 @@ import { S, PIVOT } from '../store';
 // OBJECT_FRAME.product, so a rig auto-scales to the loaded asset. Applying REPLACES the working
 // lights but keeps the Environment (IBL).
 
-export type LightPresetKind = 'three-point';
+export type LightPresetKind = 'three-point' | 'gobo';
 export type LightRole = 'key' | 'fill' | 'rim';
 
 export interface PresetLightSpec {
@@ -25,6 +26,7 @@ export interface PresetLightSpec {
   angle?: number;      // spot cone half-angle (rad)
   penumbra?: number;   // spot edge softness
   sizeMul?: number;    // area emitter size = OBJECT_FRAME.product · sizeMul
+  gobo?: Partial<LightGobo>; // spot only — projects a gobo/cookie (seeded from defaultGobo)
 }
 
 export interface LightPreset {
@@ -49,6 +51,16 @@ export const LIGHT_PRESETS: LightPreset[] = [
       // Rim: directly BEHIND and high — a strong back light that grazes the silhouette so the camera
       // sees a bright lit edge (rim). Rim/kickers must be intense (they only catch grazing edges).
       { role: 'rim', kind: 'spot', az: 168, el: 32, distMul: 1.1, intensity: 20, castShadow: false, angle: 0.8, penumbra: 1 },
+    ],
+  },
+  {
+    // A single gobo spot aimed at the product (with a soft fill so it isn't pitch-black). The spot
+    // carries a default gobo (Blinds) — switch the pattern from the dropdown in its inspector.
+    kind: 'gobo', label: 'Gobo', selectRole: 'key', envIntensity: 0.3,
+    lights: [
+      { role: 'key', kind: 'spot', az: 22, el: 30, distMul: 1.15, intensity: 13, castShadow: true, angle: 0.7, penumbra: 0.35,
+        gobo: { enabled: true, pattern: 'blinds', size: 1, rotation: 0, sharpness: 0.85, contrast: 1 } },
+      { role: 'fill', kind: 'area', az: -46, el: 14, distMul: 1.35, intensity: 2.5, castShadow: false, sizeMul: 0.9 },
     ],
   },
 ];
@@ -77,6 +89,7 @@ function buildLight(spec: PresetLightSpec, R: number): Light {
   };
   if (spec.kind === 'spot') { over.angle = spec.angle ?? 0.6; over.penumbra = spec.penumbra ?? 0.5; }
   if (spec.kind === 'area') { const s = R * (spec.sizeMul ?? 0.9); over.width = +s.toFixed(2); over.height = +s.toFixed(2); }
+  if (spec.gobo) over.gobo = { ...defaultGobo(), ...spec.gobo };
   return makeLight(spec.kind, roleName(spec.role), over);
 }
 

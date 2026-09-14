@@ -9,8 +9,9 @@ import {
 } from '../lib/lights';
 import { round } from '../lib/eval';
 import { hdriThumbs } from '../lib/hdriThumb';
+import { GOBO_PATTERNS } from '../lib/gobo';
 import { IcTrash } from './icons';
-import type { Channel, Vec3 } from '../types';
+import type { Channel, Vec3, GoboPattern } from '../types';
 
 function KeyDot({ ch, value }: { ch: Channel; value: Vec3 | number }) {
   const l = activeLight(); if (!l) return null;
@@ -157,8 +158,24 @@ export default function LightInspector() {
               onClick={() => setLightGobo({ enabled: !l.gobo?.enabled })}>{l.gobo?.enabled ? 'On' : 'Off'}</button>
           </div>
           {l.gobo?.enabled && (<>
-            <div className="row"><span className="row-lead"><span className="kf-spacer" /><label>Pattern</label></span>
-              <span className="val" style={{ textTransform: 'capitalize' }}>{l.gobo.customName ? l.gobo.customName.slice(0, 16) : l.gobo.pattern}</span></div>
+            <div className="row">
+              <span className="row-lead"><span className="kf-spacer" /><label>Pattern</label></span>
+              <select value={l.gobo.pattern} onChange={e => setLightGobo({ pattern: e.target.value as GoboPattern })}
+                style={{ flex: '0 0 auto', minWidth: 120 }}>
+                {GOBO_PATTERNS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+            </div>
+            {l.gobo.pattern === 'custom' && (
+              <div className="row">
+                <span className="row-lead"><span className="kf-spacer" /><label>Image</label></span>
+                <label className="hdri-pick" title={l.gobo.customName || 'Load a gobo image (PNG/JPG)'} style={{ minWidth: 90 }}>
+                  <span className="hdri-empty" style={{ fontSize: 11 }}>{l.gobo.customName ? l.gobo.customName.slice(0, 14) : 'Load…'}</span>
+                  <span className="hdri-ovl">{l.gobo.customUrl ? 'Replace' : 'Load'}</span>
+                  <input type="file" accept="image/*" style={{ display: 'none' }}
+                    onChange={e => { const f = e.target.files?.[0]; if (f) setLightGobo({ customUrl: URL.createObjectURL(f), customName: f.name }); e.target.value = ''; }} />
+                </label>
+              </div>
+            )}
             <Slider label="Scale" value={l.gobo.size} min={0.25} max={4} step={0.05} onChange={v => setLightGobo({ size: v })} />
             <Slider label="Rotation" value={Math.round(l.gobo.rotation)} min={0} max={360} step={1} unit="°" onChange={v => setLightGobo({ rotation: v })} />
             <Slider label="Softness" value={round(1 - l.gobo.sharpness, 2)} min={0} max={1} step={0.05} onChange={v => setLightGobo({ sharpness: 1 - v })} />

@@ -5,7 +5,6 @@ import { useRev } from './bits';
 import Outliner from './Outliner';
 import LightInspector from './LightInspector';
 import LightingPresets from './LightingPresets';
-import GobosPanel from './GobosPanel';
 import { activeLight } from '../lib/lights';
 import { evaluate, keysOf, EASE_LIST, EASES, round, poiPoint, clamp } from '../lib/eval';
 import { applyPreset } from '../lib/presets';
@@ -264,7 +263,6 @@ export default function Inspector() {
     <div id="inspector">
       <Outliner />
       <LightingPresets />
-      <GobosPanel />
 
       {st.ui.inspect === 'light' && activeLight() ? <LightInspector />
         : st.project.cameras.length === 0 ? (

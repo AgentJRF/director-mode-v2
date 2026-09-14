@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useRev } from './bits';
 import { LIGHT_PRESETS, applyLightPreset } from '../lib/lightPresets';
 import type { LightPreset, PresetLightSpec, LightRole, LightPresetKind } from '../lib/lightPresets';
+import { goboThumb } from '../lib/gobo';
+import type { GoboPattern } from '../types';
 
 // Role tints for the schematic (the beams — the actual lamps are white).
 const ROLE_COLOR: Record<LightRole, string> = { key: '#f0b64a', fill: '#4a90d9', rim: '#e7e0cd' };
@@ -94,6 +96,25 @@ function PresetScene({ preset }: { preset: LightPreset }) {
   );
 }
 
+// The gobo pattern a preset carries (if any) — its card shows the gobo projected on a sphere instead
+// of the light-placement schematic.
+function presetGobo(preset: LightPreset): GoboPattern | undefined {
+  return preset.lights.find(l => l.gobo)?.gobo?.pattern as GoboPattern | undefined;
+}
+function GoboPreview({ pattern }: { pattern: GoboPattern }) {
+  const src = goboThumb(pattern);
+  return (
+    <div style={{ position: 'relative', width: '100%', aspectRatio: '10 / 7', background: '#17181c', borderRadius: 7, overflow: 'hidden' }}>
+      <div style={{
+        position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: '62%', aspectRatio: '1 / 1', borderRadius: '50%',
+        background: 'radial-gradient(circle at 34% 30%, #eceef0, #b7bac0 42%, #6d7075 74%, #33353a 100%)',
+      }}>
+        {src && <img src={src} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', mixBlendMode: 'multiply' }} />}
+      </div>
+    </div>
+  );
+}
+
 export default function LightingPresets() {
   useRev();
   const [open, setOpen] = useState(true);
@@ -120,7 +141,7 @@ export default function LightingPresets() {
                   border: `${on ? 2 : 1}px solid ${on ? 'var(--blue)' : 'var(--line-2)'}`,
                   borderRadius: 9,
                 }}>
-                <PresetScene preset={preset} />
+                {presetGobo(preset) ? <GoboPreview pattern={presetGobo(preset)!} /> : <PresetScene preset={preset} />}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-1)' }}>{preset.label}</span>
                   {on && (
