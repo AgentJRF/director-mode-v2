@@ -46,8 +46,9 @@ export const LIGHT_PRESETS: LightPreset[] = [
       { role: 'key', kind: 'spot', az: 35, el: 35, distMul: 1.15, intensity: 14, castShadow: true, angle: 0.6, penumbra: 0.45 },
       // Fill: soft, front-left, low — a large area light that opens the shadows without killing contrast.
       { role: 'fill', kind: 'area', az: -48, el: 16, distMul: 1.3, intensity: 4, castShadow: false, sizeMul: 0.9 },
-      // Rim: behind and high on the far side — a bright back light that separates product from the bg.
-      { role: 'rim', kind: 'spot', az: 158, el: 42, distMul: 1.1, intensity: 10, castShadow: false, angle: 0.55, penumbra: 0.6 },
+      // Rim: behind and high on the far side — a back light that separates product from the bg.
+      // Softer + gentler than the key (tuned on the bag asset: reads as a clean edge, not a hotspot).
+      { role: 'rim', kind: 'spot', az: 158, el: 42, distMul: 1.1, intensity: 6.5, castShadow: false, angle: 0.55, penumbra: 1 },
     ],
   },
 ];
