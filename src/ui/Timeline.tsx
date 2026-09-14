@@ -101,28 +101,24 @@ export default function Timeline() {
     return { c, headerY, exp, rows };
   });
 
-  // Selected light → an extra track (Position / Aim / Intensity) below the cameras (AE-style: the
-  // selected layer shows its property tracks). Env has no animatable pose, so it's skipped.
-  const selLight = st.ui.inspect === 'light' ? activeLight() : null;
-  const selLightTrack = selLight && selLight.kind !== 'env' ? selLight : null;
-  // Collapsed by default like camera tracks; the header's ▸/▾ toggles expanded['light:'+id].
-  const lightExp = selLightTrack ? !!expanded['light:' + selLightTrack.id] : false;
-  let lightHeaderY = 0;
-  const lightRows: { def: RowDef; ry: number }[] = [];
-  if (selLightTrack) {
-    lightHeaderY = yCur; yCur += TRACK_H;
-    if (lightExp) {
-      const positional = selLightTrack.kind === 'spot' || selLightTrack.kind === 'directional' || selLightTrack.kind === 'point' || selLightTrack.kind === 'area';
-      const aims = selLightTrack.kind === 'spot' || selLightTrack.kind === 'directional' || selLightTrack.kind === 'area';
-      const defs: RowDef[] = [
-        ...(positional ? [{ label: 'Position', ch: 'position' as Channel }] : []),
-        ...(aims ? [{ label: 'Aim (POI)', ch: 'poi' as Channel, lock: selLightTrack.target?.type === 'object' }] : []),
-        { label: 'Intensity', ch: 'intensity' as Channel },
-      ];
-      defs.forEach(def => { const ry = yCur; yCur += ROW_H; lightRows.push({ def, ry }); });
-    }
+  // Lights live in the timeline PERMANENTLY (like cameras / AE layers) — not only while selected.
+  // Env has no animatable pose, so it's skipped. Each track is collapsed by default (▸/▾).
+  const lightRowsFor = (l: typeof proj.lights[number]): RowDef[] => {
+    const positional = l.kind === 'spot' || l.kind === 'directional' || l.kind === 'point' || l.kind === 'area';
+    const aims = l.kind === 'spot' || l.kind === 'directional' || l.kind === 'area';
+    return [
+      ...(positional ? [{ label: 'Position', ch: 'position' as Channel }] : []),
+      ...(aims ? [{ label: 'Aim (POI)', ch: 'poi' as Channel, lock: l.target?.type === 'object' }] : []),
+      { label: 'Intensity', ch: 'intensity' as Channel },
+    ];
+  };
+  const lightLayout = proj.lights.filter(l => l.kind !== 'env').map(l => {
+    const headerY = yCur; yCur += TRACK_H;
+    const exp = !!expanded['light:' + l.id];
+    const rows = (exp ? lightRowsFor(l) : []).map(def => { const ry = yCur; yCur += ROW_H; return { def, ry }; });
     yCur += GAP;
-  }
+    return { l, headerY, exp, rows };
+  });
 
   const H = yCur + 4;
 
@@ -157,10 +153,15 @@ export default function Timeline() {
     const lkey = el.getAttribute('data-lkey');
     if (lkey) {
       try { (e.currentTarget as SVGElement).setPointerCapture(e.pointerId); } catch { /* best-effort */ }
-      const kf = activeLight()?.keyframes.find(k => k.id === lkey);
+      // Select the light that owns this key (so moveLightKeysTimes/removeLightKey act on it), then drag.
+      const owner = proj.lights.find(l => l.keyframes.some(k => k.id === lkey));
+      if (owner) { if (owner.id !== proj.activeLightId || S().ui.inspect !== 'light') selectLight(owner.id); }
+      const kf = owner?.keyframes.find(k => k.id === lkey);
       if (kf) drag.current = { mode: 'lkey', keyId: lkey, grabbedBase: kf.time, pointerId: e.pointerId };
       return;
     }
+    const lightId = el.getAttribute('data-light');
+    if (lightId) { selectLight(lightId); return; } // click a light track header → select that light
     const keyId = el.getAttribute('data-key'); const camId = el.getAttribute('data-cam');
     try { (e.currentTarget as SVGElement).setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
     if (camId && camId !== proj.activeCameraId) S().selectCamera(camId);
@@ -215,7 +216,8 @@ export default function Timeline() {
   // Drag teardown (pointerup / cancel / blur) is handled globally by the effect above.
   const onDbl = (e: React.MouseEvent) => {
     const id = (e.target as SVGElement).getAttribute('data-key'); if (id) { S().removeKey(id); return; }
-    const lid = (e.target as SVGElement).getAttribute('data-lkey'); if (lid) removeLightKey(lid);
+    const lid = (e.target as SVGElement).getAttribute('data-lkey');
+    if (lid) { const owner = proj.lights.find(l => l.keyframes.some(k => k.id === lid)); if (owner) selectLight(owner.id); removeLightKey(lid); }
   };
   const onCtx = (e: React.MouseEvent) => {
     const cid = (e.target as SVGElement).getAttribute('data-cam'); if (!cid) return; // right-click a camera bar → menu
@@ -330,31 +332,35 @@ export default function Timeline() {
             );
           })}
 
-          {selLightTrack && (
-            <g>
-              <rect x={LEFT} y={lightHeaderY} width={contentW - LEFT - RIGHT} height={TRACK_H} rx={6} fill={selLightTrack.color} fillOpacity={0.18} pointerEvents="none" />
-              {/* collapsed → keyframe ticks on the header (merged by time), like camera tracks */}
-              {!lightExp && [...new Set(selLightTrack.keyframes.map(k => Math.round(k.time * 1000)))].map(ms => {
-                const kx = x(ms / 1000);
-                return <rect key={ms} x={kx - 3} y={lightHeaderY + 9} width={6} height={TRACK_H - 18} rx={2}
-                  fill={selLightTrack.color} stroke="#0008" strokeWidth={1} pointerEvents="none" />;
-              })}
-              <text x={LEFT + 14} y={lightHeaderY + TRACK_H / 2 + 4} fill="#e6e6ea" fontSize={11} pointerEvents="none">{lightExp ? '▾' : '▸'}</text>
-              <circle cx={LEFT + 34} cy={lightHeaderY + TRACK_H / 2} r={5} fill={selLightTrack.color} pointerEvents="none" />
-              <text x={LEFT + 46} y={lightHeaderY + TRACK_H / 2 + 4} fill="#e6e6ea" fontSize={12} pointerEvents="none">{selLightTrack.name} · light</text>
-              <rect data-toggle={'light:' + selLightTrack.id} x={LEFT + 6} y={lightHeaderY} width={26} height={TRACK_H} fill="none" pointerEvents="all" style={{ cursor: 'pointer' }} />
-              {lightRows.map(({ def, ry }) => {
-                const rcy = ry + ROW_H / 2;
-                return (
-                  <g key={def.label}>
-                    <text x={LEFT + 32} y={rcy + 3} fill={def.lock ? '#6b6270' : '#9aa3ab'} fontSize={10}>{def.label}{def.lock ? ' ⚿' : ''}</text>
-                    <line x1={LEFT} y1={ry + ROW_H - 1} x2={contentW - RIGHT} y2={ry + ROW_H - 1} stroke="#2a2130" />
-                    {lightKeysOf(selLightTrack, def.ch).map(k => lightDiamond(k, x(k.time), rcy, selLightTrack.color))}
-                  </g>
-                );
-              })}
-            </g>
-          )}
+          {lightLayout.map(({ l, headerY, exp, rows }) => {
+            const active = l.id === proj.activeLightId && st.ui.inspect === 'light';
+            return (
+              <g key={l.id}>
+                <rect data-light={l.id} x={LEFT} y={headerY} width={contentW - LEFT - RIGHT} height={TRACK_H} rx={6}
+                  fill={l.color} fillOpacity={active ? 0.30 : 0.14} style={{ cursor: 'pointer' }} />
+                {/* collapsed → keyframe ticks on the header (merged by time), like camera tracks */}
+                {!exp && [...new Set(l.keyframes.map(k => Math.round(k.time * 1000)))].map(ms => {
+                  const kx = x(ms / 1000);
+                  return <rect key={ms} x={kx - 3} y={headerY + 9} width={6} height={TRACK_H - 18} rx={2}
+                    fill={l.color} stroke="#0008" strokeWidth={1} pointerEvents="none" />;
+                })}
+                <text x={LEFT + 14} y={headerY + TRACK_H / 2 + 4} fill="#e6e6ea" fontSize={11} pointerEvents="none">{exp ? '▾' : '▸'}</text>
+                <circle cx={LEFT + 34} cy={headerY + TRACK_H / 2} r={5} fill={l.color} pointerEvents="none" />
+                <text x={LEFT + 46} y={headerY + TRACK_H / 2 + 4} fill={active ? '#ffffff' : '#e6e6ea'} fillOpacity={active ? 1 : 0.8} fontSize={12} pointerEvents="none">{l.name} · light</text>
+                <rect data-toggle={'light:' + l.id} x={LEFT + 6} y={headerY} width={26} height={TRACK_H} fill="none" pointerEvents="all" style={{ cursor: 'pointer' }} />
+                {rows.map(({ def, ry }) => {
+                  const rcy = ry + ROW_H / 2;
+                  return (
+                    <g key={def.label}>
+                      <text x={LEFT + 32} y={rcy + 3} fill={def.lock ? '#6b6270' : '#9aa3ab'} fontSize={10}>{def.label}{def.lock ? ' ⚿' : ''}</text>
+                      <line x1={LEFT} y1={ry + ROW_H - 1} x2={contentW - RIGHT} y2={ry + ROW_H - 1} stroke="#2a2130" />
+                      {lightKeysOf(l, def.ch).map(k => lightDiamond(k, x(k.time), rcy, l.color))}
+                    </g>
+                  );
+                })}
+              </g>
+            );
+          })}
 
           {marquee && <rect x={Math.min(marquee.x0, marquee.x1)} y={Math.min(marquee.y0, marquee.y1)}
             width={Math.abs(marquee.x1 - marquee.x0)} height={Math.abs(marquee.y1 - marquee.y0)}
