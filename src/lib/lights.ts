@@ -16,6 +16,15 @@ export function selectLight(id: string) {
   st.ui.selectedKeyIds = [];
   st.bump();
 }
+// Drop the current light selection (e.g. clicking empty timeline space) → back to the camera panel.
+export function deselectLight() {
+  const st = S();
+  if (st.project.activeLightId === '' && st.ui.inspect !== 'light') return;
+  st.project.activeLightId = '';
+  st.ui.inspect = 'camera';
+  st.ui.selectedKeyIds = [];
+  st.bump();
+}
 
 // ── keyframe primitive (mirrors upsertKeyOn, but on a Light) ─────────────────
 function lkeys(light: Light, ch: Channel): Keyframe[] {

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { S, CAM_COLORS, clipRange } from '../store';
 import { useRev } from './bits';
 import { clamp, evaluate, keysOf, poiPoint } from '../lib/eval';
-import { activeLight, lightKeysOf, moveLightKeysTimes, removeLightKey } from '../lib/lights';
+import { activeLight, lightKeysOf, moveLightKeysTimes, removeLightKey, selectLight, deselectLight } from '../lib/lights';
 import { toTimecode, fromTimecode, snapToFrame, niceFrameStep } from '../lib/time';
 import type { Channel, Keyframe } from '../types';
 
@@ -184,7 +184,7 @@ export default function Timeline() {
       drag.current = { mode: 'clip-move', camId: targetId, baseStart: cs, grabT: timeFromX(px), moved: false, pointerId: e.pointerId };
     }
     else if (py < TOP_H) { drag.current = { mode: 'scrub', pointerId: e.pointerId }; S().setPlayhead(snap(timeFromX(px))); } // ruler → scrub
-    else { drag.current = { mode: 'marquee', x0: px, y0: py, moved: false, pointerId: e.pointerId }; setMarquee({ x0: px, y0: py, x1: px, y1: py }); } // body → drag-select
+    else { if (S().ui.inspect === 'light') deselectLight(); drag.current = { mode: 'marquee', x0: px, y0: py, moved: false, pointerId: e.pointerId }; setMarquee({ x0: px, y0: py, x1: px, y1: py }); } // body → deselect light + drag-select
   };
   const onMove = (e: React.PointerEvent) => {
     if (!drag.current) return; const { x: px, y: py } = svgPt(e);

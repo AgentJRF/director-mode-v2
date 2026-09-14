@@ -4,6 +4,7 @@ import { S, DEFAULT_APERTURE } from '../store';
 import { useRev } from './bits';
 import Outliner from './Outliner';
 import LightInspector from './LightInspector';
+import LightingPresets from './LightingPresets';
 import { activeLight } from '../lib/lights';
 import { evaluate, keysOf, EASE_LIST, EASES, round, poiPoint, clamp } from '../lib/eval';
 import { applyPreset } from '../lib/presets';
@@ -261,6 +262,7 @@ export default function Inspector() {
   return (
     <div id="inspector">
       <Outliner />
+      <LightingPresets />
 
       {st.ui.inspect === 'light' && activeLight() ? <LightInspector />
         : st.project.cameras.length === 0 ? (
