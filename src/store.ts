@@ -127,7 +127,6 @@ interface StoreState {
   setSplineViz: (m: 'none' | 'height' | 'speed') => void;
   setGizmoDragging: (b: boolean) => void;
   setGizmoMode: (m: 'translate' | 'rotate') => void;
-  setGizmoSpace: (s: 'world' | 'local') => void;
   toggleGizmoSpace: () => void;
 }
 
@@ -423,7 +422,6 @@ export const useStore = create<StoreState>((set, get) => {
     setSplineViz: m => { get().ui.splineViz = m; bump(); },
     setGizmoDragging: b => { get().ui.gizmoDragging = b; bump(); },
     setGizmoMode: m => { get().ui.gizmoMode = m; bump(); },
-    setGizmoSpace: s => { get().ui.gizmoSpace = s; bump(); },
     // Toggle the orientation frame of whichever gizmo is being edited: light when the light panel is
     // active, camera otherwise — so the button/R shortcut only affects the selected entity's gizmo.
     toggleGizmoSpace: () => { const ui = get().ui; if (ui.inspect === 'light') ui.gizmoSpaceLight = ui.gizmoSpaceLight === 'world' ? 'local' : 'world'; else ui.gizmoSpace = ui.gizmoSpace === 'world' ? 'local' : 'world'; bump(); },

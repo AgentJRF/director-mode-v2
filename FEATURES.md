@@ -136,7 +136,7 @@ src/
     SplineOverlay.tsx   vue Caméra : repère de visée en overlay SVG projeté
     multiview/          rendu et gizmos de la vue Quad
   ui/                   Topbar, Toolbar, Inspector, Timeline, ViewPills, HUD, Modals, Toast, Outliner
-public/asset/           studio_packshot.gltf + .bin (~43 Mo) + textures PBR + fonts Adobe Clean
+public/asset/           Outdoor_Bag_Blue_orange_V03.glb (~61 Mo) + hdri/ (env map 2K)
 ```
 
 ## 17. Pistes / roadmap

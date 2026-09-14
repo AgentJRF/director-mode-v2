@@ -69,7 +69,7 @@ src/
     SplineOverlay.tsx      vue Caméra : spline en overlay SVG projeté
     shared.ts              pont r3f ↔ overlay DOM
   ui/                      Topbar, Toolbar, Inspector, Timeline, Generators, ViewPills, HUD, Modals, Toast
-public/asset/              studio_packshot.gltf + .bin (45 Mo) + textures PBR
+public/asset/              Outdoor_Bag_Blue_orange_V03.glb (~61 Mo) + hdri/ (env map 2K)
 ```
 
 ## Principes non négociables (respectés)
