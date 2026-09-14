@@ -19,7 +19,7 @@ export default function LightMarkers() {
         return (
           <mesh key={l.id} position={p} userData={{ gizmo: { kind: 'light-marker', id: l.id } }}
             onPointerDown={e => { e.stopPropagation(); selectLight(l.id); }}>
-            <sphereGeometry args={[0.085, 16, 16]} />
+            <sphereGeometry args={[0.13, 16, 16]} />
             <meshBasicMaterial color={l.color} />
           </mesh>
         );
