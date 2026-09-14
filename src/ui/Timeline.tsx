@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { S, CAM_COLORS, clipRange } from '../store';
 import { useRev } from './bits';
 import { clamp, evaluate, keysOf, poiPoint } from '../lib/eval';
+import { activeLight, lightKeysOf, moveLightKeysTimes, removeLightKey } from '../lib/lights';
 import { toTimecode, fromTimecode, snapToFrame, niceFrameStep } from '../lib/time';
 import type { Channel, Keyframe } from '../types';
 
@@ -23,7 +24,7 @@ export default function Timeline() {
   const [colorMenu, setColorMenu] = useState<{ camId: string; x: number; y: number } | null>(null);
   const [ctxMenu, setCtxMenu] = useState<{ camId: string; x: number; y: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-  const drag = useRef<{ mode: 'scrub' | 'key' | 'marquee' | 'clip' | 'clip-move'; keyId?: string; camId?: string; edge?: 'start' | 'end'; x0?: number; y0?: number; moved?: boolean; grabbedBase?: number; base?: { id: string; t: number }[]; baseStart?: number; grabT?: number; pointerId?: number } | null>(null);
+  const drag = useRef<{ mode: 'scrub' | 'key' | 'marquee' | 'clip' | 'clip-move' | 'lkey'; keyId?: string; camId?: string; edge?: 'start' | 'end'; x0?: number; y0?: number; moved?: boolean; grabbedBase?: number; base?: { id: string; t: number }[]; baseStart?: number; grabT?: number; pointerId?: number } | null>(null);
 
   // End any in-progress drag on ANY pointerup/cancel or window blur — even if the SVG's own pointerup is
   // missed (released outside the element, over browser chrome, etc.). Also releases the pointer capture so
@@ -100,7 +101,25 @@ export default function Timeline() {
     return { c, headerY, exp, rows };
   });
 
-  // The timeline is CAMERAS ONLY — lights are never shown here (edit lights in the Inspector).
+  // Selected light → an extra track (Position / Aim / Intensity) below the cameras (AE-style: the
+  // selected layer shows its property tracks). Env has no animatable pose, so it's skipped.
+  const selLight = st.ui.inspect === 'light' ? activeLight() : null;
+  const selLightTrack = selLight && selLight.kind !== 'env' ? selLight : null;
+  let lightHeaderY = 0;
+  const lightRows: { def: RowDef; ry: number }[] = [];
+  if (selLightTrack) {
+    lightHeaderY = yCur; yCur += TRACK_H;
+    const positional = selLightTrack.kind === 'spot' || selLightTrack.kind === 'directional' || selLightTrack.kind === 'point' || selLightTrack.kind === 'area';
+    const aims = selLightTrack.kind === 'spot' || selLightTrack.kind === 'directional' || selLightTrack.kind === 'area';
+    const defs: RowDef[] = [
+      ...(positional ? [{ label: 'Position', ch: 'position' as Channel }] : []),
+      ...(aims ? [{ label: 'Aim (POI)', ch: 'poi' as Channel, lock: selLightTrack.target?.type === 'object' }] : []),
+      { label: 'Intensity', ch: 'intensity' as Channel },
+    ];
+    defs.forEach(def => { const ry = yCur; yCur += ROW_H; lightRows.push({ def, ry }); });
+    yCur += GAP;
+  }
+
   const H = yCur + 4;
 
   // screen positions of every visible (expanded) keyframe diamond — used for marquee hit-testing
@@ -129,6 +148,13 @@ export default function Timeline() {
       if (clipEdge !== proj.activeCameraId) S().selectCamera(clipEdge);
       try { (e.currentTarget as SVGElement).setPointerCapture(e.pointerId); } catch { /* best-effort */ }
       drag.current = { mode: 'clip', camId: clipEdge, edge, pointerId: e.pointerId };
+      return;
+    }
+    const lkey = el.getAttribute('data-lkey');
+    if (lkey) {
+      try { (e.currentTarget as SVGElement).setPointerCapture(e.pointerId); } catch { /* best-effort */ }
+      const kf = activeLight()?.keyframes.find(k => k.id === lkey);
+      if (kf) drag.current = { mode: 'lkey', keyId: lkey, grabbedBase: kf.time, pointerId: e.pointerId };
       return;
     }
     const keyId = el.getAttribute('data-key'); const camId = el.getAttribute('data-cam');
@@ -162,6 +188,9 @@ export default function Timeline() {
       const dt = snap(timeFromX(px)) - drag.current.grabbedBase!; // frame-snapped delta, applied to the whole group
       S().moveKeysTimes(drag.current.base.map(b => ({ id: b.id, time: b.t + dt })));
     }
+    else if (drag.current.mode === 'lkey') {
+      moveLightKeysTimes([{ id: drag.current.keyId!, time: snap(timeFromX(px)) }]);
+    }
     else if (drag.current.mode === 'clip' && drag.current.camId) {
       const c = proj.cameras.find(cc => cc.id === drag.current!.camId); if (!c) return;
       const [cs, ce] = clipRange(c, dur); const t = snapTime(timeFromX(px), drag.current.camId);
@@ -182,6 +211,7 @@ export default function Timeline() {
   // Drag teardown (pointerup / cancel / blur) is handled globally by the effect above.
   const onDbl = (e: React.MouseEvent) => {
     const id = (e.target as SVGElement).getAttribute('data-key'); if (id) { S().removeKey(id); return; }
+    const lid = (e.target as SVGElement).getAttribute('data-lkey'); if (lid) removeLightKey(lid);
   };
   const onCtx = (e: React.MouseEvent) => {
     const cid = (e.target as SVGElement).getAttribute('data-cam'); if (!cid) return; // right-click a camera bar → menu
@@ -193,6 +223,11 @@ export default function Timeline() {
     return <rect key={k.id} data-key={k.id} data-cam={camId} x={cx - half} y={cy - half} width={half * 2} height={half * 2}
       transform={`rotate(45 ${cx} ${cy})`} fill="#f5c400" stroke={sel ? '#ffffff' : '#8a6d00'} strokeWidth={sel ? 1.6 : 1} style={{ cursor: 'grab' }} />;
   };
+
+  const lightDiamond = (k: Keyframe, cx: number, cy: number, color: string) => (
+    <rect key={k.id} data-lkey={k.id} x={cx - 5} y={cy - 5} width={10} height={10}
+      transform={`rotate(45 ${cx} ${cy})`} fill={color} stroke="#0008" strokeWidth={1} style={{ cursor: 'grab' }} />
+  );
 
   const playing = tl.playing;
   const durInputVal = durUnit === 's' ? +dur.toFixed(2) : Math.round(dur * fps);
@@ -291,6 +326,23 @@ export default function Timeline() {
             );
           })}
 
+          {selLightTrack && (
+            <g>
+              <rect x={LEFT} y={lightHeaderY} width={contentW - LEFT - RIGHT} height={TRACK_H} rx={6} fill={selLightTrack.color} fillOpacity={0.18} pointerEvents="none" />
+              <circle cx={LEFT + 12} cy={lightHeaderY + TRACK_H / 2} r={5} fill={selLightTrack.color} pointerEvents="none" />
+              <text x={LEFT + 24} y={lightHeaderY + TRACK_H / 2 + 4} fill="#e6e6ea" fontSize={12} pointerEvents="none">{selLightTrack.name} · light</text>
+              {lightRows.map(({ def, ry }) => {
+                const rcy = ry + ROW_H / 2;
+                return (
+                  <g key={def.label}>
+                    <text x={LEFT + 32} y={rcy + 3} fill={def.lock ? '#6b6270' : '#9aa3ab'} fontSize={10}>{def.label}{def.lock ? ' ⚿' : ''}</text>
+                    <line x1={LEFT} y1={ry + ROW_H - 1} x2={contentW - RIGHT} y2={ry + ROW_H - 1} stroke="#2a2130" />
+                    {lightKeysOf(selLightTrack, def.ch).map(k => lightDiamond(k, x(k.time), rcy, selLightTrack.color))}
+                  </g>
+                );
+              })}
+            </g>
+          )}
 
           {marquee && <rect x={Math.min(marquee.x0, marquee.x1)} y={Math.min(marquee.y0, marquee.y1)}
             width={Math.abs(marquee.x1 - marquee.x0)} height={Math.abs(marquee.y1 - marquee.y0)}
