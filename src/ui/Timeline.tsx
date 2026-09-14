@@ -105,18 +105,22 @@ export default function Timeline() {
   // selected layer shows its property tracks). Env has no animatable pose, so it's skipped.
   const selLight = st.ui.inspect === 'light' ? activeLight() : null;
   const selLightTrack = selLight && selLight.kind !== 'env' ? selLight : null;
+  // Collapsed by default like camera tracks; the header's ▸/▾ toggles expanded['light:'+id].
+  const lightExp = selLightTrack ? !!expanded['light:' + selLightTrack.id] : false;
   let lightHeaderY = 0;
   const lightRows: { def: RowDef; ry: number }[] = [];
   if (selLightTrack) {
     lightHeaderY = yCur; yCur += TRACK_H;
-    const positional = selLightTrack.kind === 'spot' || selLightTrack.kind === 'directional' || selLightTrack.kind === 'point' || selLightTrack.kind === 'area';
-    const aims = selLightTrack.kind === 'spot' || selLightTrack.kind === 'directional' || selLightTrack.kind === 'area';
-    const defs: RowDef[] = [
-      ...(positional ? [{ label: 'Position', ch: 'position' as Channel }] : []),
-      ...(aims ? [{ label: 'Aim (POI)', ch: 'poi' as Channel, lock: selLightTrack.target?.type === 'object' }] : []),
-      { label: 'Intensity', ch: 'intensity' as Channel },
-    ];
-    defs.forEach(def => { const ry = yCur; yCur += ROW_H; lightRows.push({ def, ry }); });
+    if (lightExp) {
+      const positional = selLightTrack.kind === 'spot' || selLightTrack.kind === 'directional' || selLightTrack.kind === 'point' || selLightTrack.kind === 'area';
+      const aims = selLightTrack.kind === 'spot' || selLightTrack.kind === 'directional' || selLightTrack.kind === 'area';
+      const defs: RowDef[] = [
+        ...(positional ? [{ label: 'Position', ch: 'position' as Channel }] : []),
+        ...(aims ? [{ label: 'Aim (POI)', ch: 'poi' as Channel, lock: selLightTrack.target?.type === 'object' }] : []),
+        { label: 'Intensity', ch: 'intensity' as Channel },
+      ];
+      defs.forEach(def => { const ry = yCur; yCur += ROW_H; lightRows.push({ def, ry }); });
+    }
     yCur += GAP;
   }
 
@@ -329,8 +333,16 @@ export default function Timeline() {
           {selLightTrack && (
             <g>
               <rect x={LEFT} y={lightHeaderY} width={contentW - LEFT - RIGHT} height={TRACK_H} rx={6} fill={selLightTrack.color} fillOpacity={0.18} pointerEvents="none" />
-              <circle cx={LEFT + 12} cy={lightHeaderY + TRACK_H / 2} r={5} fill={selLightTrack.color} pointerEvents="none" />
-              <text x={LEFT + 24} y={lightHeaderY + TRACK_H / 2 + 4} fill="#e6e6ea" fontSize={12} pointerEvents="none">{selLightTrack.name} · light</text>
+              {/* collapsed → keyframe ticks on the header (merged by time), like camera tracks */}
+              {!lightExp && [...new Set(selLightTrack.keyframes.map(k => Math.round(k.time * 1000)))].map(ms => {
+                const kx = x(ms / 1000);
+                return <rect key={ms} x={kx - 3} y={lightHeaderY + 9} width={6} height={TRACK_H - 18} rx={2}
+                  fill={selLightTrack.color} stroke="#0008" strokeWidth={1} pointerEvents="none" />;
+              })}
+              <text x={LEFT + 14} y={lightHeaderY + TRACK_H / 2 + 4} fill="#e6e6ea" fontSize={11} pointerEvents="none">{lightExp ? '▾' : '▸'}</text>
+              <circle cx={LEFT + 34} cy={lightHeaderY + TRACK_H / 2} r={5} fill={selLightTrack.color} pointerEvents="none" />
+              <text x={LEFT + 46} y={lightHeaderY + TRACK_H / 2 + 4} fill="#e6e6ea" fontSize={12} pointerEvents="none">{selLightTrack.name} · light</text>
+              <rect data-toggle={'light:' + selLightTrack.id} x={LEFT + 6} y={lightHeaderY} width={26} height={TRACK_H} fill="none" pointerEvents="all" style={{ cursor: 'pointer' }} />
               {lightRows.map(({ def, ry }) => {
                 const rcy = ry + ROW_H / 2;
                 return (
