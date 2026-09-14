@@ -11,10 +11,14 @@ export default function CameraMarkers() {
   useStore(s => s.rev);
   const proj = S().project; const t = proj.timeline.playhead; const interp = S().ui.interp;
   const activeId = proj.activeCameraId; const hidden = S().ui.hidden;
+  // The active camera is normally drawn by the PivotControls gizmo — but that gizmo is hidden while a
+  // light is being inspected, so still draw its marker then, otherwise there's nothing to click to
+  // re-select the camera in the viewport.
+  const camGizmoShown = S().ui.inspect === 'camera';
   return (
     <>
       {proj.cameras.map(c => {
-        if (!interp && c.id === activeId) return null;   // active shown by the gizmo body
+        if (!interp && c.id === activeId && camGizmoShown) return null;   // active shown by the gizmo body
         if (hidden['cam:' + c.id]) return null;
         const pose = evaluate(c, t);
         const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(d2r(pose.rotation[0]), d2r(pose.rotation[1]), d2r(pose.rotation[2]), 'YXZ'));
