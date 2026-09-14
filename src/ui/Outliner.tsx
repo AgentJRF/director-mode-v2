@@ -76,18 +76,19 @@ export default function Outliner() {
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [camMenu, setCamMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const [addLightMenu, setAddLightMenu] = useState<{ x: number; y: number } | null>(null);
+  const [addCamMenu, setAddCamMenu] = useState<{ x: number; y: number } | null>(null);
   const [open, setOpen] = useState({ cameras: true, lights: true, objects: true });
   const toggle = (k: keyof typeof open) => setOpen(o => ({ ...o, [k]: !o[k] }));
 
   useEffect(() => {
-    if (!menu && !camMenu && !addLightMenu) return;
-    const close = () => { setMenu(null); setCamMenu(null); setAddLightMenu(null); };
+    if (!menu && !camMenu && !addLightMenu && !addCamMenu) return;
+    const close = () => { setMenu(null); setCamMenu(null); setAddLightMenu(null); setAddCamMenu(null); };
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
     window.addEventListener('pointerdown', close);
     window.addEventListener('scroll', close, true);
     window.addEventListener('keydown', onKey);
     return () => { window.removeEventListener('pointerdown', close); window.removeEventListener('scroll', close, true); window.removeEventListener('keydown', onKey); };
-  }, [menu, camMenu, addLightMenu]);
+  }, [menu, camMenu, addLightMenu, addCamMenu]);
 
   const isTarget = (id: string) => cam.target?.type === 'object' && cam.target.objectId === id;
   const onTargetContext = (e: React.MouseEvent, id: string) => {
@@ -107,7 +108,7 @@ export default function Outliner() {
       <div className="insp-h">Scene</div>
       <div className="sect ol">
         <Group title="Cameras" count={proj.cameras.length} open={open.cameras} onToggle={() => toggle('cameras')}
-          onAdd={() => st.addCamera()} addTitle="New camera">
+          onAdd={e => setAddCamMenu({ x: e.clientX, y: e.clientY })} addTitle="Add a camera">
           {proj.cameras.length === 0 && <div className="ol-empty">No cameras — click + to add one.</div>}
           {proj.cameras.map(c => {
             const active = c.id === proj.activeCameraId;
@@ -167,6 +168,20 @@ export default function Outliner() {
               <span style={{ display: 'inline-flex', color: 'var(--ink-2)' }}><LightGlyph kind={kind} /></span>{label}
             </button>
           ))}
+        </div>
+      )}
+
+      {addCamMenu && (
+        <div style={{
+          position: 'fixed', left: Math.min(addCamMenu.x, window.innerWidth - 188), top: addCamMenu.y, zIndex: 100,
+          background: 'var(--panel-2)', border: '1px solid var(--line-2)', borderRadius: 6,
+          boxShadow: '0 8px 30px rgba(0,0,0,.5)', padding: 4, minWidth: 170,
+        }} onPointerDown={e => e.stopPropagation()}>
+          <button className="btn-sm btn-full" style={{ border: 'none', justifyContent: 'flex-start' }}
+            onClick={() => { st.addCamera(false); setAddCamMenu(null); }}>New camera</button>
+          <button className="btn-sm btn-full" style={{ border: 'none', justifyContent: 'flex-start' }}
+            title="Place the camera at the current Scene view"
+            onClick={() => { st.addCamera(true); setAddCamMenu(null); }}>From current view</button>
         </div>
       )}
 

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as THREE from 'three';
 import type { Camera, Channel, Ease, KeySource, Project, Target, Tool, Vec3 } from './types';
-import { clamp, eulerFromLookAt, evaluate, keysOf, poiPoint, round, uid, hasAnim } from './lib/eval';
+import { clamp, eulerFromLookAt, evaluate, keysOf, poiPoint, round, uid, hasAnim, OBJECT_FRAME } from './lib/eval';
 import { makeLight } from './lib/lightRig';
 import { R3 } from './three/shared';
 
@@ -75,7 +75,7 @@ interface StoreState {
   setTool: (t: Tool) => void;
   toast: (m: string) => void;
   selectCamera: (id: string) => void;
-  addCamera: () => void;
+  addCamera: (fromView?: boolean) => void;
   removeCamera: (id: string) => void;
   duplicateCamera: (id: string) => string | undefined;
   setCameraColor: (id: string, color: string) => void;
@@ -224,13 +224,20 @@ export const useStore = create<StoreState>((set, get) => {
     setTool: t => { get().ui.tool = t; bump(); },
     toast: m => { get().ui.toast = m; bump(); setTimeout(() => { if (get().ui.toast === m) { get().ui.toast = ''; bump(); } }, 2600); },
     selectCamera: id => { get().project.activeCameraId = id; get().ui.inspect = 'camera'; get().ui.selectedKeyIds = []; get().ui.targetSelected = false; bump(); },
-    addCamera: () => {
+    addCamera: (fromView = false) => {
       const p = get().project;
       const c = makeCamera('Camera ' + String(p.cameras.length + 1).padStart(2, '0'), undefined, nextColor());
-      // Frame the new camera on the CURRENT Scene viewpoint (position + look direction + matching focal),
-      // so "New camera" captures exactly what you're looking at. Falls back to the default pose if the
-      // scene camera isn't mounted yet.
-      const sc = R3.sceneCam;
+      // Default: a predictable 3/4 framing on the product. Opt-in `fromView`: capture the current Scene
+      // viewpoint instead (kept as an explicit choice — it can be surprising as the default).
+      const sc = fromView ? R3.sceneCam : null;
+      if (!fromView) {
+        const dist = Math.max(OBJECT_FRAME.product || 6, 4);
+        const dir = new THREE.Vector3(0.85, 0.5, 1.1).normalize();
+        const pos: Vec3 = [round(PIVOT.x + dir.x * dist, 3), round(PIVOT.y + dir.y * dist, 3), round(PIVOT.z + dir.z * dist, 3)];
+        c.transform.position = pos;
+        c.transform.rotation = eulerFromLookAt(pos, [PIVOT.x, PIVOT.y, PIVOT.z]);
+        c.optics.focalLength = 35;
+      }
       if (sc) {
         // Capture the Scene viewpoint, but keep a natural 35mm lens (not a computed wide focal): keep
         // the look direction and DOLLY the camera along its view axis so the product stays framed the
