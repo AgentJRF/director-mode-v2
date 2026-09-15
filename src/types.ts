@@ -47,7 +47,7 @@ export type LightKind = 'spot' | 'directional' | 'point' | 'ambient' | 'hemisphe
 
 // A gobo / light cookie: a grayscale mask projected by a SPOT (three's SpotLight.map). White passes
 // light, dark blocks it — so the spot throws a pattern (blinds, window, foliage…) onto the scene.
-export type GoboPattern = 'blinds' | 'window' | 'slats' | 'grid' | 'dots' | 'dappled' | 'custom';
+export type GoboPattern = 'blinds' | 'window' | 'foliage1' | 'foliage2' | 'caustics1' | 'caustics2' | 'custom';
 export interface LightGobo {
   enabled: boolean;
   pattern: GoboPattern;         // which projected cookie

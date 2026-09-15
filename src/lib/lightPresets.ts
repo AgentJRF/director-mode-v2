@@ -58,7 +58,7 @@ export const LIGHT_PRESETS: LightPreset[] = [
     // carries a default gobo (Blinds) — switch the pattern from the dropdown in its inspector.
     kind: 'gobo', label: 'Gobo', selectRole: 'key', envIntensity: 0.3,
     lights: [
-      { role: 'key', kind: 'spot', az: 22, el: 30, distMul: 1.15, intensity: 13, castShadow: true, angle: 0.7, penumbra: 0.35,
+      { role: 'key', kind: 'spot', az: 22, el: 30, distMul: 0.8, intensity: 11, castShadow: true, angle: 0.5, penumbra: 0.35,
         gobo: { enabled: true, pattern: 'blinds', size: 1, rotation: 0, sharpness: 0.85, contrast: 1 } },
       { role: 'fill', kind: 'area', az: -46, el: 14, distMul: 1.35, intensity: 2.5, castShadow: false, sizeMul: 0.9 },
     ],

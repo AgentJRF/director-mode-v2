@@ -42,6 +42,8 @@ function PresetScene({ preset }: { preset: LightPreset }) {
   const rimB: [number, number] = [CX + Math.cos(rimAngle + 0.55) * R, CY + Math.sin(rimAngle + 0.55) * R];
   const pattern = presetGobo(preset);
   const src = pattern ? goboSphereThumb(pattern) : null;
+  // A gobo card is about the projected pattern — show only the gobo-carrying light(s), not the fill.
+  const shown = pattern ? preset.lights.filter(l => l.gobo) : preset.lights;
 
   return (
     <svg viewBox="12 8 176 123.2" width="100%" style={{ display: 'block', background: '#17181c', borderRadius: 7 }}
@@ -60,7 +62,7 @@ function PresetScene({ preset }: { preset: LightPreset }) {
       <ellipse cx={CX} cy={94} rx={R * 1.3} ry={7} fill="#000" opacity="0.4" />
 
       {/* light flux — a soft cone from each lamp onto the sphere */}
-      {preset.lights.map((l, i) => {
+      {shown.map((l, i) => {
         const { gx, gy, behind } = project(dirOf(l));
         const dx = CX - gx, dy = CY - gy, len = Math.hypot(dx, dy) || 1;
         const ux = dx / len, uy = dy / len, px = -uy, py = ux;
@@ -90,7 +92,7 @@ function PresetScene({ preset }: { preset: LightPreset }) {
         fill="none" stroke={ROLE_COLOR.rim} strokeWidth={rim ? 2.4 : 0} strokeLinecap="round" opacity="0.85" />
 
       {/* lamp glyphs at their real placement */}
-      {preset.lights.map((l, i) => {
+      {shown.map((l, i) => {
         const { gx, gy, behind } = project(dirOf(l));
         const col = ROLE_COLOR[l.role];
         return (

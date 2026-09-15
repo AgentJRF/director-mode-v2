@@ -10,12 +10,23 @@ import type { GoboPattern, LightGobo } from '../types';
 export const GOBO_PATTERNS: { id: GoboPattern; label: string }[] = [
   { id: 'blinds', label: 'Blinds' },
   { id: 'window', label: 'Window' },
-  { id: 'slats', label: 'Slats' },
-  { id: 'grid', label: 'Grid' },
-  { id: 'dots', label: 'Dots' },
-  { id: 'dappled', label: 'Foliage' },
+  { id: 'foliage1', label: 'Foliage 1' },
+  { id: 'foliage2', label: 'Foliage 2' },
+  { id: 'caustics1', label: 'Caustics 1' },
+  { id: 'caustics2', label: 'Caustics 2' },
   { id: 'custom', label: 'Custom…' },
 ];
+
+// Image-backed gobos: grayscale masks shipped in public/gobos (white = light passes, dark = blocked).
+// Resolved to a texture via goboImageTexture (same path as an uploaded custom gobo), not drawGobo.
+const GOBO_IMAGE_URL: Partial<Record<GoboPattern, string>> = {
+  foliage1: '/gobos/foliage-1.jpg',
+  foliage2: '/gobos/foliage-2.jpg',
+  caustics1: '/gobos/caustics-1.jpg',
+  caustics2: '/gobos/caustics-2.jpg',
+};
+// The public URL for an image-backed gobo pattern (undefined for procedural patterns).
+export const goboImageUrl = (pattern: GoboPattern): string | undefined => GOBO_IMAGE_URL[pattern];
 
 export function defaultGobo(): LightGobo {
   return { enabled: true, pattern: 'blinds', size: 1, rotation: 0, sharpness: 0.8, contrast: 1 };
@@ -37,19 +48,10 @@ function drawGobo(pattern: GoboPattern, sharpness: number, contrast: number): HT
   const blockBase = () => { x.fillStyle = dark; x.fillRect(0, 0, SIZE, SIZE); };      // blocked
 
   switch (pattern) {
-    case 'blinds': case 'slats': {
-      openBase(); feather(); x.fillStyle = dark;
+    case 'blinds': {
+      openBase(); feather(); x.fillStyle = dark;         // horizontal venetian bars
       const n = 7, p = SIZE / n, bar = p * 0.52;
-      for (let i = -1; i <= n; i++) {                    // ±1 so the blur wraps cleanly with RepeatWrapping
-        if (pattern === 'blinds') x.fillRect(-blur, i * p, SIZE + blur * 2, bar);
-        else x.fillRect(i * p, -blur, bar, SIZE + blur * 2);
-      }
-      break;
-    }
-    case 'grid': {
-      openBase(); feather(); x.fillStyle = dark;
-      const n = 6, p = SIZE / n, t = p * 0.28;
-      for (let i = -1; i <= n; i++) { x.fillRect(-blur, i * p, SIZE + blur * 2, t); x.fillRect(i * p, -blur, t, SIZE + blur * 2); }
+      for (let i = -1; i <= n; i++) x.fillRect(-blur, i * p, SIZE + blur * 2, bar); // ±1 so blur wraps with RepeatWrapping
       break;
     }
     case 'window': {
@@ -60,38 +62,39 @@ function drawGobo(pattern: GoboPattern, sharpness: number, contrast: number): HT
         x.fillRect(m + cc * (pw + m), m + r * (ph + m), pw, ph);
       break;
     }
-    case 'dots': {
-      blockBase(); feather(); x.fillStyle = '#ffffff';   // pin-spots of light on a dark field
-      const n = 5, p = SIZE / n, r = p * 0.28;
-      for (let i = -1; i <= n; i++) for (let j = -1; j <= n; j++) {
-        x.beginPath(); x.arc(p * (i + 0.5), p * (j + 0.5), r, 0, Math.PI * 2); x.fill();
-      }
-      break;
-    }
-    case 'dappled': {
-      openBase();                                         // organic leaf shadows: soft dark blobs
-      x.filter = `blur(${6 + blur}px)`; x.fillStyle = dark;
-      let s = 1337; const rnd = () => (s = (s * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
-      for (let i = 0; i < 64; i++) {
-        const cx = rnd() * SIZE, cy = rnd() * SIZE, rr = SIZE * (0.035 + rnd() * 0.09);
-        x.save(); x.translate(cx, cy); x.rotate(rnd() * Math.PI);
-        x.beginPath(); x.ellipse(0, 0, rr, rr * (0.55 + rnd() * 0.8), 0, 0, Math.PI * 2); x.fill(); x.restore();
-      }
-      break;
-    }
-    default:
+    default:                                              // image-backed patterns are handled elsewhere
       openBase();
   }
   x.filter = 'none';
   return c;
 }
 
-// A cached CanvasTexture for a procedural gobo (keyed by the baked params). Caller applies size/rotation.
+// Bake Scale (repeat) + Rotation into the mask. three.js does NOT apply a texture's matrix
+// (repeat/rotation/offset) to a SpotLight.map, so these must be drawn in, not set on the texture.
+// size > 1 zooms in (bigger pattern); size < 1 tiles denser. Rotation is in degrees, about the centre.
+function applyGoboTransform(base: HTMLCanvasElement, size = 1, rotationDeg = 0): HTMLCanvasElement {
+  const s = Math.max(0.1, size || 1);
+  if (s === 1 && (!rotationDeg || rotationDeg % 360 === 0)) return base; // nothing to bake
+  const c = document.createElement('canvas'); c.width = c.height = SIZE;
+  const x = c.getContext('2d')!;
+  const pat = x.createPattern(base, 'repeat')!;
+  const m = new DOMMatrix();
+  m.translateSelf(SIZE / 2, SIZE / 2);
+  m.rotateSelf(rotationDeg || 0);
+  m.scaleSelf(s, s);
+  m.translateSelf(-SIZE / 2, -SIZE / 2);
+  pat.setTransform(m);
+  x.fillStyle = pat;
+  x.fillRect(0, 0, SIZE, SIZE);
+  return c;
+}
+
+// A CanvasTexture for a procedural gobo, with Scale/Rotation baked in (see applyGoboTransform).
 export function goboCanvasTexture(g: LightGobo): THREE.Texture {
   const key = `${g.pattern}|${g.sharpness}|${g.contrast}`;
   let canvas = canvasCache.get(key);
   if (!canvas) { canvas = drawGobo(g.pattern, g.sharpness, g.contrast); canvasCache.set(key, canvas); }
-  const tex = new THREE.CanvasTexture(canvas);
+  const tex = new THREE.CanvasTexture(applyGoboTransform(canvas, g.size, g.rotation));
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.center.set(0.5, 0.5);
@@ -148,6 +151,46 @@ export function goboSphereThumb(pattern: GoboPattern): string {
   octx.putImageData(img, 0, 0);
   const u = out.toDataURL('image/png'); sphereThumbCache.set(pattern, u);
   return u;
+}
+
+// Preloaded gobo source images (shared, keyed by URL). Returns the element once decoded, else null
+// (kicks off the load and calls onReady when done so the caller can rebuild).
+const goboImgCache = new Map<string, HTMLImageElement>();
+const goboImgLoading = new Set<string>();
+function loadGoboImage(url: string, onReady?: () => void): HTMLImageElement | null {
+  const hit = goboImgCache.get(url);
+  if (hit) return hit;
+  if (!goboImgLoading.has(url)) {
+    goboImgLoading.add(url);
+    const img = new Image();
+    img.onload = () => { goboImgCache.set(url, img); goboImgLoading.delete(url); onReady?.(); };
+    img.onerror = () => { goboImgLoading.delete(url); };
+    img.src = url;
+  }
+  return null;
+}
+
+// An image-backed gobo baked to a canvas so Softness (blur) and Contrast behave exactly like the
+// procedural patterns. Rebuilt whenever pattern/sharpness/contrast change (SceneLights' memo deps).
+// Returns null until the source image has loaded (then onReady triggers a rebuild).
+export function goboImageCanvasTexture(g: LightGobo, url: string, onReady?: () => void): THREE.Texture | null {
+  const img = loadGoboImage(url, onReady);
+  if (!img) return null;
+  const c = document.createElement('canvas'); c.width = c.height = SIZE;
+  const x = c.getContext('2d')!;
+  x.fillStyle = '#ffffff'; x.fillRect(0, 0, SIZE, SIZE);   // white base = light passes
+  const blur = (1 - (g.sharpness ?? 0.85)) * 12;           // Softness → edge feather
+  x.filter = blur ? `blur(${blur}px)` : 'none';
+  x.drawImage(img, 0, 0, SIZE, SIZE);
+  x.filter = 'none';
+  const wash = 1 - (g.contrast ?? 1);                       // Contrast down → fade the pattern toward white
+  if (wash > 0) { x.globalAlpha = wash; x.fillStyle = '#ffffff'; x.fillRect(0, 0, SIZE, SIZE); x.globalAlpha = 1; }
+  const tex = new THREE.CanvasTexture(applyGoboTransform(c, g.size, g.rotation)); // bake Scale + Rotation
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.center.set(0.5, 0.5);
+  tex.anisotropy = 4;
+  return tex;
 }
 
 // A cached image texture for a custom (uploaded) gobo. `onLoad` lets the caller trigger a re-render.

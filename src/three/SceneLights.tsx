@@ -8,7 +8,7 @@ import { S, useStore } from '../store';
 import { evalLight, lightPoi } from '../lib/lightEval';
 import { lightHideKey } from '../lib/lightRig';
 import { hdriThumbs, makeHdriThumb } from '../lib/hdriThumb';
-import { goboCanvasTexture, goboImageTexture } from '../lib/gobo';
+import { goboCanvasTexture, goboImageCanvasTexture, goboImageUrl } from '../lib/gobo';
 import type { Light } from '../types';
 
 // RectAreaLight needs its BRDF lookup tables initialised once before any area light renders.
@@ -32,12 +32,16 @@ function LightNode({ light }: { light: Light }) {
   const goboMap = useMemo(() => {
     const g = light.gobo;
     if (light.kind !== 'spot' || !g || !g.enabled) return null;
-    if (g.pattern === 'custom') return g.customUrl ? goboImageTexture(g.customUrl, () => S().bump()) : null;
+    // Image-backed gobos (foliage/caustics) and uploaded 'custom' are baked to a canvas so Softness +
+    // Contrast apply (like the procedural blinds/window). All paths return a canvas texture we own.
+    const url = g.pattern === 'custom' ? g.customUrl : goboImageUrl(g.pattern);
+    if (url) return goboImageCanvasTexture(g, url, () => S().bump());
+    if (g.pattern === 'custom') return null; // custom selected but no image loaded yet
     return goboCanvasTexture(g);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [light.kind, light.gobo?.enabled, light.gobo?.pattern, light.gobo?.sharpness, light.gobo?.contrast, light.gobo?.customUrl]);
+  }, [light.kind, light.gobo?.enabled, light.gobo?.pattern, light.gobo?.sharpness, light.gobo?.contrast, light.gobo?.size, light.gobo?.rotation, light.gobo?.customUrl]);
   useEffect(() => {
-    const owned = !!goboMap && light.gobo?.pattern !== 'custom'; // procedural textures are ours to dispose
+    const owned = !!goboMap; // every gobo texture is now a canvas texture we create → dispose on change
     return () => { if (owned) goboMap!.dispose(); };
   }, [goboMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -75,14 +79,8 @@ function LightNode({ light }: { light: Light }) {
       s.angle = l.angle ?? 0.6; s.penumbra = l.penumbra ?? 0.5;
       s.distance = l.distance ?? 0; s.decay = l.decay ?? 1.2;
       s.castShadow = !!l.castShadow;
-      // Gobo transform (the map itself is the <spotLight map> prop): live size + rotation.
-      const g = l.gobo;
-      if (g && g.enabled && s.map) {
-        s.map.center.set(0.5, 0.5);
-        s.map.rotation = (g.rotation || 0) * Math.PI / 180;
-        const rep = 1 / Math.max(0.1, g.size || 1);
-        s.map.repeat.set(rep, rep);
-      }
+      // Gobo Scale/Rotation are baked into the map canvas (three ignores a SpotLight.map's texture
+      // matrix), so nothing to update per-frame here.
     }
   });
 
