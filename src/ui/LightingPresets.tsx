@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useRev } from './bits';
 import { LIGHT_PRESETS, applyLightPreset } from '../lib/lightPresets';
 import type { LightPreset, PresetLightSpec, LightRole, LightPresetKind } from '../lib/lightPresets';
-import { goboThumb } from '../lib/gobo';
+import { goboSphereThumb } from '../lib/gobo';
 import type { GoboPattern } from '../types';
 
-// Role tints for the schematic (the beams — the actual lamps are white).
-const ROLE_COLOR: Record<LightRole, string> = { key: '#f0b64a', fill: '#4a90d9', rim: '#e7e0cd' };
+// Monochrome schematic: key = bright, fill = mid, rim = light gray. No hues — the card reads as a
+// single-tone lighting swatch (same look for three-point and gobo).
+const ROLE_COLOR: Record<LightRole, string> = { key: '#e9ebee', fill: '#8b8e94', rim: '#c6c8cc' };
 
 // 3D unit direction from the subject toward a light (0° az = front/+Z, +az = right).
 function dirOf(s: PresetLightSpec): [number, number, number] {
@@ -20,21 +21,30 @@ function project(d: [number, number, number]) {
   return { gx: CX + d[0] * SPREAD, gy: CY - d[1] * SPREAD * 0.72 + d[2] * SPREAD * 0.2, behind: d[2] < -0.1 };
 }
 
-// A ¾-view scene: a neutral GRAY sphere "asset" on the ground, with a visible cone of light (flux)
-// flowing from each lamp onto the sphere, plus the key highlight + a rim edge so you read the look.
+// The gobo pattern a preset carries (if any) — projected on the sphere within the schematic.
+function presetGobo(preset: LightPreset): GoboPattern | undefined {
+  return preset.lights.find(l => l.gobo)?.gobo?.pattern as GoboPattern | undefined;
+}
+
+// A ¾-view scene: a neutral GRAY sphere "asset" on the ground, with a cone of light (flux) flowing from
+// each lamp onto the sphere, the key highlight + a rim edge — all MONOCHROME. When the preset carries a
+// gobo, its pattern is projected onto the sphere so the gobo card keeps this same schematic look.
 function PresetScene({ preset }: { preset: LightPreset }) {
   const key = preset.lights.find(l => l.role === 'key');
   const kd = key ? dirOf(key) : [0.5, 0.5, 0.6];
   const hx = 0.5 + kd[0] * 0.3, hy = 0.5 - kd[1] * 0.3;   // gray highlight toward the key
   const gid = `sph-${preset.kind}`;
+  const clip = `clip-${preset.kind}`;
   const rim = preset.lights.find(l => l.role === 'rim');
   const rd = rim ? dirOf(rim) : [-0.4, 0.5, -0.7];
   const rimAngle = Math.atan2(-rd[1], rd[0]);
   const rimA: [number, number] = [CX + Math.cos(rimAngle - 0.55) * R, CY + Math.sin(rimAngle - 0.55) * R];
   const rimB: [number, number] = [CX + Math.cos(rimAngle + 0.55) * R, CY + Math.sin(rimAngle + 0.55) * R];
+  const pattern = presetGobo(preset);
+  const src = pattern ? goboSphereThumb(pattern) : null;
 
   return (
-    <svg viewBox="0 0 200 140" width="100%" style={{ display: 'block', background: '#17181c', borderRadius: 7 }}
+    <svg viewBox="12 8 176 123.2" width="100%" style={{ display: 'block', background: '#17181c', borderRadius: 7 }}
       role="img" aria-label={`${preset.label} lighting: gray sphere lit by ${preset.lights.map(l => l.role).join(', ')}`}>
       <defs>
         <radialGradient id={gid} cx={hx} cy={hy} r="0.85">
@@ -43,6 +53,7 @@ function PresetScene({ preset }: { preset: LightPreset }) {
           <stop offset="74%" stopColor="#6d7075" />
           <stop offset="100%" stopColor="#33353a" />
         </radialGradient>
+        <clipPath id={clip}><circle cx={CX} cy={CY} r={R} /></clipPath>
       </defs>
 
       <ellipse cx={CX} cy={116} rx={90} ry={16} fill="#202127" />
@@ -71,6 +82,9 @@ function PresetScene({ preset }: { preset: LightPreset }) {
 
       {/* the gray asset sphere */}
       <circle cx={CX} cy={CY} r={R} fill={`url(#${gid})`} />
+      {/* gobo pattern projected on the sphere (monochrome, multiplied) */}
+      {src && <image href={src} x={CX - R} y={CY - R} width={R * 2} height={R * 2} preserveAspectRatio="xMidYMid slice"
+        clipPath={`url(#${clip})`} style={{ mixBlendMode: 'multiply' }} opacity="0.9" />}
       {/* rim edge highlight */}
       <path d={`M${rimA[0].toFixed(1)} ${rimA[1].toFixed(1)} A ${R} ${R} 0 0 1 ${rimB[0].toFixed(1)} ${rimB[1].toFixed(1)}`}
         fill="none" stroke={ROLE_COLOR.rim} strokeWidth={rim ? 2.4 : 0} strokeLinecap="round" opacity="0.85" />
@@ -93,25 +107,6 @@ function PresetScene({ preset }: { preset: LightPreset }) {
         );
       })}
     </svg>
-  );
-}
-
-// The gobo pattern a preset carries (if any) — its card shows the gobo projected on a sphere instead
-// of the light-placement schematic.
-function presetGobo(preset: LightPreset): GoboPattern | undefined {
-  return preset.lights.find(l => l.gobo)?.gobo?.pattern as GoboPattern | undefined;
-}
-function GoboPreview({ pattern }: { pattern: GoboPattern }) {
-  const src = goboThumb(pattern);
-  return (
-    <div style={{ position: 'relative', width: '100%', aspectRatio: '10 / 7', background: '#17181c', borderRadius: 7, overflow: 'hidden' }}>
-      <div style={{
-        position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: '62%', aspectRatio: '1 / 1', borderRadius: '50%',
-        background: 'radial-gradient(circle at 34% 30%, #eceef0, #b7bac0 42%, #6d7075 74%, #33353a 100%)',
-      }}>
-        {src && <img src={src} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%', mixBlendMode: 'multiply' }} />}
-      </div>
-    </div>
   );
 }
 
@@ -141,7 +136,7 @@ export default function LightingPresets() {
                   border: `${on ? 2 : 1}px solid ${on ? 'var(--blue)' : 'var(--line-2)'}`,
                   borderRadius: 9,
                 }}>
-                {presetGobo(preset) ? <GoboPreview pattern={presetGobo(preset)!} /> : <PresetScene preset={preset} />}
+                <PresetScene preset={preset} />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-1)' }}>{preset.label}</span>
                   {on && (

@@ -113,6 +113,43 @@ export function goboThumb(pattern: GoboPattern): string {
   return u;
 }
 
+// A preview of the pattern PROJECTED ON A SPHERE (for the lighting-preset card): the flat mask is
+// remapped through asin(x)/asin(y) so straight lines bow and compress toward the rim (curvature), and
+// the pattern strength fades to neutral near the edge (light falls off at the limb). Grayscale + alpha,
+// meant to be multiply-blended over the card's shaded gray sphere. Cached per pattern.
+const sphereThumbCache = new Map<GoboPattern, string>();
+export function goboSphereThumb(pattern: GoboPattern): string {
+  if (pattern === 'custom') return '';
+  const hit = sphereThumbCache.get(pattern);
+  if (hit) return hit;
+  const src = drawGobo(pattern, 0.8, 1);                 // flat mask (SIZE×SIZE)
+  const sdata = src.getContext('2d')!.getImageData(0, 0, SIZE, SIZE).data;
+  const N = 160, Rr = N / 2;
+  const out = document.createElement('canvas'); out.width = out.height = N;
+  const octx = out.getContext('2d')!;
+  const img = octx.createImageData(N, N); const d = img.data;
+  const smooth = (a: number, b: number, x: number) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+  for (let py = 0; py < N; py++) {
+    for (let px = 0; px < N; px++) {
+      const nx = (px + 0.5 - Rr) / Rr, ny = (py + 0.5 - Rr) / Rr;
+      const r2 = nx * nx + ny * ny; const idx = (py * N + px) * 4;
+      if (r2 > 1) { d[idx + 3] = 0; continue; }
+      // spherical remap: edges sample a wider range → the pattern compresses toward the rim
+      const uu = 0.5 + Math.asin(Math.max(-1, Math.min(1, nx))) / Math.PI;
+      const vv = 0.5 + Math.asin(Math.max(-1, Math.min(1, ny))) / Math.PI;
+      const sx = Math.min(SIZE - 1, Math.max(0, (uu * SIZE) | 0));
+      const sy = Math.min(SIZE - 1, Math.max(0, (vv * SIZE) | 0));
+      const p = sdata[(sy * SIZE + sx) * 4];             // grayscale mask value
+      const f = 1 - smooth(0.5, 1.0, Math.sqrt(r2));     // pattern strength → 0 at the limb
+      const val = Math.round(255 * (1 - f) + p * f);     // neutral (255) at rim, pattern in the centre
+      d[idx] = d[idx + 1] = d[idx + 2] = val; d[idx + 3] = 255;
+    }
+  }
+  octx.putImageData(img, 0, 0);
+  const u = out.toDataURL('image/png'); sphereThumbCache.set(pattern, u);
+  return u;
+}
+
 // A cached image texture for a custom (uploaded) gobo. `onLoad` lets the caller trigger a re-render.
 export function goboImageTexture(url: string, onLoad?: () => void): THREE.Texture {
   let tex = imgCache.get(url);

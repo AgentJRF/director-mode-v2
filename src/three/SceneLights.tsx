@@ -138,7 +138,8 @@ const hdriExt = (s: string) => { const m = /\.([a-z0-9]+)(?:\?|#|$)/i.exec(s); r
 // Render the equirect flat into an equirect-mapped HalfFloat RT, multiplied by `colorHex` (Colorize).
 // HalfFloat + NoToneMapping keep the HDR range intact so the PMREM built from it still lights correctly.
 function tintEquirect(gl: THREE.WebGLRenderer, tex: THREE.Texture, colorHex: string): THREE.WebGLRenderTarget {
-  const W = tex.image.width, H = tex.image.height;
+  const img = tex.image as { width: number; height: number };
+  const W = img.width, H = img.height;
   const rt = new THREE.WebGLRenderTarget(W, H, { type: THREE.HalfFloatType });
   const scene = new THREE.Scene();
   const cam = new THREE.OrthographicCamera(-1, 1, 0.5, -0.5, 0, 1);

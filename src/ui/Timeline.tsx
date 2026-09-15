@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { S, CAM_COLORS, clipRange } from '../store';
 import { useRev } from './bits';
 import { clamp, evaluate, keysOf, poiPoint } from '../lib/eval';
-import { activeLight, lightKeysOf, moveLightKeysTimes, removeLightKey, selectLight, deselectLight } from '../lib/lights';
+import { lightKeysOf, moveLightKeysTimes, removeLightKey, selectLight, deselectLight } from '../lib/lights';
 import { toTimecode, fromTimecode, snapToFrame, niceFrameStep } from '../lib/time';
 import type { Channel, Keyframe } from '../types';
 
