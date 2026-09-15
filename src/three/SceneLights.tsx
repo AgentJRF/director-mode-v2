@@ -104,14 +104,14 @@ function LightNode({ light }: { light: Light }) {
         {/* Shadow-only proxy (RectAreaLight can't cast). Near-zero intensity adds no visible light,
             but the ShadowMaterial catcher shows its shadow. */}
         <spotLight ref={shadowRef} position={pos} intensity={0.0001} angle={1.1} penumbra={1} distance={0}
-          castShadow={!!light.castShadow} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0003}
+          castShadow={!!light.castShadow} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0003} shadow-radius={6} shadow-blurSamples={16}
           shadow-normalBias={0.03} shadow-camera-near={0.5} shadow-camera-far={60} />
         <primitive object={target} />
       </>);
     case 'directional':
       return (<>
         <directionalLight ref={ref} position={pos} intensity={light.intensity} color={light.color}
-          castShadow={!!light.castShadow} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0003} shadow-normalBias={0.03}
+          castShadow={!!light.castShadow} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0003} shadow-radius={6} shadow-blurSamples={16} shadow-normalBias={0.03}
           shadow-camera-near={0.5} shadow-camera-far={80}
           shadow-camera-left={-10} shadow-camera-right={10} shadow-camera-top={10} shadow-camera-bottom={-10} />
         <primitive object={target} />
@@ -125,7 +125,7 @@ function LightNode({ light }: { light: Light }) {
         <spotLight ref={ref} position={pos} intensity={light.intensity} color={light.color}
           angle={light.angle ?? 0.6} penumbra={light.penumbra ?? 0.5}
           distance={light.distance ?? 0} decay={light.decay ?? 1.2} map={goboMap ?? undefined}
-          castShadow={!!light.castShadow} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0003}
+          castShadow={!!light.castShadow} shadow-mapSize={[2048, 2048]} shadow-bias={-0.0003} shadow-radius={6} shadow-blurSamples={16}
           shadow-normalBias={0.03} shadow-camera-near={0.5} shadow-camera-far={60} />
         <primitive object={target} />
       </>);

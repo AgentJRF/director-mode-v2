@@ -3,7 +3,7 @@ import { useRev } from './bits';
 import { evalLight, lightPoi } from '../lib/lightEval';
 import {
   activeLight, lightKeysOf, removeLight, duplicateLight, lightKindLabel,
-  setLightColor, setLightGroundColor, setLightAngle, setLightPenumbra, setLightCastShadow,
+  setLightColor, setLightGroundColor, setLightAngle, setLightPenumbra,
   setLightWidth, setLightHeight, clearLightTarget, setLightEnvRotation, setLightHdri, setLightColorize,
   editLightIntensity, editLightPos, editLightPoi, toggleLightKey, setLightGobo,
 } from '../lib/lights';
@@ -56,7 +56,6 @@ export default function LightInspector() {
   const st = S(); const t = st.project.timeline.playhead;
   const pose = evalLight(l, t);
   const isSpot = l.kind === 'spot';
-  const isDir = l.kind === 'directional';
   const isArea = l.kind === 'area';
   const positional = l.kind === 'spot' || l.kind === 'directional' || l.kind === 'point' || l.kind === 'area';
   const aims = l.kind === 'spot' || l.kind === 'directional' || l.kind === 'area';
@@ -142,12 +141,6 @@ export default function LightInspector() {
         {isSpot && <Slider label="Softness" value={l.penumbra ?? 0.5} min={0} max={1} step={0.05} onChange={setLightPenumbra} />}
         {isArea && <Slider label="Width" value={l.width ?? 4} min={0.1} max={20} step={0.1} onChange={setLightWidth} />}
         {isArea && <Slider label="Height" value={l.height ?? 2} min={0.1} max={20} step={0.1} onChange={setLightHeight} />}
-        {(isSpot || isDir || isArea) && (
-          <div className="row">
-            <span className="row-lead"><span className="kf-spacer" /><label>Shadow</label></span>
-            <button className={'btn-sm' + (l.castShadow ? ' amber' : '')} onClick={() => setLightCastShadow(!l.castShadow)}>{l.castShadow ? 'On' : 'Off'}</button>
-          </div>
-        )}
       </div>
 
       {isSpot && (
@@ -168,8 +161,10 @@ export default function LightInspector() {
             {l.gobo.pattern === 'custom' && (
               <div className="row">
                 <span className="row-lead"><span className="kf-spacer" /><label>Image</label></span>
-                <label className="hdri-pick" title={l.gobo.customName || 'Load a gobo image (PNG/JPG)'} style={{ minWidth: 90 }}>
-                  <span className="hdri-empty" style={{ fontSize: 11 }}>{l.gobo.customName ? l.gobo.customName.slice(0, 14) : 'Load…'}</span>
+                <label className="hdri-pick" title={l.gobo.customName || 'Load a gobo image (PNG/JPG)'}>
+                  {l.gobo.customUrl
+                    ? <img src={l.gobo.customUrl} alt={l.gobo.customName || ''} style={{ width: 40, height: 40, objectFit: 'cover', display: 'block' }} />
+                    : <span className="hdri-empty" style={{ fontSize: 11 }}>Load</span>}
                   <span className="hdri-ovl">{l.gobo.customUrl ? 'Replace' : 'Load'}</span>
                   <input type="file" accept="image/*" style={{ display: 'none' }}
                     onChange={e => { const f = e.target.files?.[0]; if (f) setLightGobo({ customUrl: URL.createObjectURL(f), customName: f.name }); e.target.value = ''; }} />
