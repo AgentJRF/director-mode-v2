@@ -22,6 +22,9 @@ function LightNode({ light }: { light: Light }) {
   // SpotLight proxy (near-zero intensity — the ShadowMaterial catcher shows the shadow regardless of
   // intensity, so it adds no visible light but does cast the shadow).
   const shadowRef = useRef<any>(null);
+  // Bumped when an async gobo image finishes decoding, to re-run the goboMap memo (its gobo-param deps
+  // don't change on load, so without this the map would stay null after a first-time image select).
+  const [imgTick, setImgTick] = useState(0);
   // Persistent aim target for spot/directional (and the area shadow proxy). Kept in the scene graph via
   // <primitive> so its matrixWorld updates; only assigned as a light's target when it actually aims.
   const target = useMemo(() => new THREE.Object3D(), []);
@@ -35,11 +38,11 @@ function LightNode({ light }: { light: Light }) {
     // Image-backed gobos (foliage/caustics) and uploaded 'custom' are baked to a canvas so Softness +
     // Contrast apply (like the procedural blinds/window). All paths return a canvas texture we own.
     const url = g.pattern === 'custom' ? g.customUrl : goboImageUrl(g.pattern);
-    if (url) return goboImageCanvasTexture(g, url, () => S().bump());
+    if (url) return goboImageCanvasTexture(g, url, () => setImgTick(t => t + 1));
     if (g.pattern === 'custom') return null; // custom selected but no image loaded yet
     return goboCanvasTexture(g);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [light.kind, light.gobo?.enabled, light.gobo?.pattern, light.gobo?.sharpness, light.gobo?.contrast, light.gobo?.size, light.gobo?.rotation, light.gobo?.customUrl]);
+  }, [light.kind, light.gobo?.enabled, light.gobo?.pattern, light.gobo?.sharpness, light.gobo?.contrast, light.gobo?.size, light.gobo?.rotation, light.gobo?.customUrl, imgTick]);
   useEffect(() => {
     const owned = !!goboMap; // every gobo texture is now a canvas texture we create → dispose on change
     return () => { if (owned) goboMap!.dispose(); };

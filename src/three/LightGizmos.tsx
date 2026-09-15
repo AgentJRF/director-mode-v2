@@ -105,7 +105,7 @@ export default function LightGizmos() {
         onDragStart={onDragStart} onDrag={onDrag} onDragEnd={onDragEnd}>
         {/* Small emissive marker tinted with the light's colour so the selected light reads clearly. */}
         <mesh userData={{ gizmo: { kind: 'light' } }}>
-          <sphereGeometry args={[0.11, 20, 20]} />
+          <sphereGeometry args={[0.06, 20, 20]} />
           <meshStandardMaterial color={l.color} emissive={l.color} emissiveIntensity={0.9} roughness={0.4} metalness={0.2} />
         </mesh>
       </PivotControls>
