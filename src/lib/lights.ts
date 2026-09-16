@@ -75,6 +75,16 @@ export function removeLight(id: string) {
   delete st.ui.hidden[lightHideKey(id)];
   st.bump();
 }
+// Remove every light in a named group (added by a preset). Env is never grouped, so it's safe.
+export function removeLightGroup(group: string) {
+  const st = S(); const p = st.project;
+  const removed = new Set(p.lights.filter(l => l.group === group).map(l => l.id));
+  if (!removed.size) return;
+  p.lights = p.lights.filter(l => !removed.has(l.id));
+  removed.forEach(id => delete st.ui.hidden[lightHideKey(id)]);
+  if (removed.has(p.activeLightId)) p.activeLightId = p.lights.length ? p.lights[p.lights.length - 1].id : '';
+  st.bump();
+}
 export function duplicateLight(id: string) {
   const st = S(); const p = st.project;
   const idx = p.lights.findIndex(l => l.id === id); if (idx < 0) return;

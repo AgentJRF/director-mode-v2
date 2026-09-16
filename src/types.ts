@@ -77,6 +77,7 @@ export interface Light {
   height?: number;              // area (RectAreaLight) emitter height
   gobo?: LightGobo;             // spot occluder
   castShadow?: boolean;
+  group?: string;               // outliner sub-group name (e.g. the preset a rig was added under)
   // env (image-based environment light / IBL) only:
   hdri?: string;                // URL to the equirect map — a public path or a runtime object URL
   hdriName?: string;            // original filename (display + extension → loader choice for object URLs)

@@ -115,7 +115,7 @@ export function specPosition(az: number, el: number, dist: number): Vec3 {
   ];
 }
 
-function buildLight(spec: PresetLightSpec, R: number): Light {
+function buildLight(spec: PresetLightSpec, R: number, group?: string): Light {
   const position = specPosition(spec.az, spec.el, R * spec.distMul);
   const pivotArr: Vec3 = [PIVOT.x, PIVOT.y, PIVOT.z];
   const over: Partial<Light> = {
@@ -128,16 +128,29 @@ function buildLight(spec: PresetLightSpec, R: number): Light {
   if (spec.kind === 'area') { const s = R * (spec.sizeMul ?? 0.9); over.width = +s.toFixed(2); over.height = +s.toFixed(2); }
   if (spec.color) over.color = spec.color;
   if (spec.gobo) over.gobo = { ...defaultGobo(), ...spec.gobo };
+  if (group) over.group = group;
   return makeLight(spec.kind, roleName(spec.role), over);
 }
 
+// Make a group name unique against the groups already present (Softbox → Softbox 2, …).
+function uniqueGroup(base: string): string {
+  const used = new Set(S().project.lights.map(l => l.group).filter(Boolean) as string[]);
+  if (!used.has(base)) return base;
+  let i = 2; while (used.has(`${base} ${i}`)) i++;
+  return `${base} ${i}`;
+}
+
 // Apply ANY declarative rig (built-in preset OR a bespoke one, e.g. from the AI match).
-// Replaces the working lights, KEEPS the environment/IBL (and cameras, untouched).
-export function applyRig(preset: LightPreset) {
+// KEEPS the environment/IBL (and cameras, untouched).
+//  - default (replace): swaps the working rig — used by the AI lighting flows (set up the scene).
+//  - opts.add: APPENDS the rig as a named group, leaving existing lights in place (preset gallery).
+export function applyRig(preset: LightPreset, opts?: { add?: boolean }) {
   const st = S(); const p = st.project;
   const R = OBJECT_FRAME.product || 6;
+  const add = !!opts?.add;
+  const group = add ? uniqueGroup(preset.label) : undefined;
 
-  const rig = preset.lights.map(spec => buildLight(spec, R));
+  const rig = preset.lights.map(spec => buildLight(spec, R, group));
 
   const env = p.lights.filter(l => l.kind === 'env');
   env.forEach(e => {
@@ -146,13 +159,14 @@ export function applyRig(preset: LightPreset) {
     if (preset.envColor) { e.color = preset.envColor; e.colorize = true; }
     else e.colorize = false;
   });
-  p.lights = [...env, ...rig];
+  const keep = add ? p.lights.filter(l => l.kind !== 'env') : []; // add mode → keep existing lights
+  p.lights = [...env, ...keep, ...rig];
   const sel = rig[preset.lights.findIndex(s => s.role === preset.selectRole)] ?? rig[0];
   p.activeLightId = sel.id; st.ui.inspect = 'light';
-  st.bump(); st.toast(`${preset.label} lighting applied`);
+  st.bump(); st.toast(add ? `${preset.label} added` : `${preset.label} lighting applied`);
 }
 
-export function applyLightPreset(kind: LightPresetKind) {
+export function applyLightPreset(kind: LightPresetKind, opts?: { add?: boolean }) {
   const preset = LIGHT_PRESETS.find(x => x.kind === kind);
-  if (preset) applyRig(preset);
+  if (preset) applyRig(preset, opts);
 }

@@ -35,17 +35,28 @@ export function saveCurrentAsPreset(name: string): void {
 
 export function deleteUserPreset(id: string) { persist(loadUserPresets().filter(p => p.id !== id)); S().bump(); }
 
-// Apply a user preset: replace the working lights with fresh clones, keep the env but reapply its saved
-// settings. Mirrors applyLightPreset (keeps cameras + the env entity, swaps the working rig).
-export function applyUserPreset(id: string) {
+// Apply a user preset. Keeps the env but reapplies its saved settings. Mirrors applyRig:
+//  - default (replace): swaps the working rig.
+//  - opts.add: APPENDS the rig as a group named after the preset, keeping existing lights.
+export function applyUserPreset(id: string, opts?: { add?: boolean }) {
   const preset = loadUserPresets().find(p => p.id === id); if (!preset) return;
   const st = S(); const p = st.project;
-  const rig = structuredClone(preset.lights).map(l => ({ ...l, id: uid(), keyframes: l.keyframes.map(k => ({ ...k, id: uid() })) }));
+  const add = !!opts?.add;
+  const group = add ? uniqueGroup(preset.name) : undefined;
+  const rig = structuredClone(preset.lights).map(l => ({ ...l, id: uid(), group, keyframes: l.keyframes.map(k => ({ ...k, id: uid() })) }));
   const env = p.lights.filter(l => l.kind === 'env');
   if (preset.env) env.forEach(e => { e.intensity = preset.env!.intensity; e.color = preset.env!.color; e.colorize = preset.env!.colorize; e.envRotation = preset.env!.envRotation; });
-  p.lights = [...env, ...rig];
+  const keep = add ? p.lights.filter(l => l.kind !== 'env') : [];
+  p.lights = [...env, ...keep, ...rig];
   const sel = rig[0]; if (sel) { p.activeLightId = sel.id; st.ui.inspect = 'light'; }
-  st.bump(); st.toast(`${preset.name} applied`);
+  st.bump(); st.toast(add ? `${preset.name} added` : `${preset.name} applied`);
+}
+
+function uniqueGroup(base: string): string {
+  const used = new Set(S().project.lights.map(l => l.group).filter(Boolean) as string[]);
+  if (!used.has(base)) return base;
+  let i = 2; while (used.has(`${base} ${i}`)) i++;
+  return `${base} ${i}`;
 }
 
 // Derive placement specs from a saved preset's lights so its card reuses the same schematic thumbnail as

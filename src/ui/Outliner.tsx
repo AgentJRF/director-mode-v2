@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import { S } from '../store';
 import { useRev } from './bits';
-import { selectLight, addLight, removeLight } from '../lib/lights';
+import { selectLight, addLight, removeLight, removeLightGroup } from '../lib/lights';
 import { lightHideKey } from '../lib/lightRig';
 import { IcCamera, IcCube, IcTarget, IcTrash, IcEye } from './icons';
 import type { LightKind } from '../types';
@@ -79,6 +79,8 @@ export default function Outliner() {
   const [addCamMenu, setAddCamMenu] = useState<{ x: number; y: number } | null>(null);
   const [open, setOpen] = useState({ cameras: true, lights: true, objects: true });
   const toggle = (k: keyof typeof open) => setOpen(o => ({ ...o, [k]: !o[k] }));
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const toggleGroup = (g: string) => setOpenGroups(o => ({ ...o, [g]: !(o[g] ?? true) }));
 
   useEffect(() => {
     if (!menu && !camMenu && !addLightMenu && !addCamMenu) return;
@@ -102,6 +104,18 @@ export default function Outliner() {
     { kind: 'spot', label: 'Spot' }, { kind: 'area', label: 'Area' },
     { kind: 'hemisphere', label: 'Dome' }, { kind: 'point', label: 'Point' },
   ];
+
+  const lightRow = (l: typeof proj.lights[number]) => {
+    const on = l.id === proj.activeLightId && st.ui.inspect === 'light';
+    return (
+      <div key={l.id} className={'ol-row' + (on ? ' sel' : '')} onClick={() => selectLight(l.id)}>
+        <span className="ol-ic" style={{ color: l.color }}><LightGlyph kind={l.kind} /></span>
+        <span className="nm">{l.name}</span>
+        <span className="ol-eye" title="Delete light" onClick={e => { e.stopPropagation(); removeLight(l.id); }}><IcTrash size={13} /></span>
+        <Eye id={lightHideKey(l.id)} />
+      </div>
+    );
+  };
 
   return (
     <>
@@ -131,14 +145,21 @@ export default function Outliner() {
         <Group title="Lights" count={proj.lights.length} open={open.lights} onToggle={() => toggle('lights')}
           onAdd={e => setAddLightMenu({ x: e.clientX, y: e.clientY })} addTitle="Add a light">
           {proj.lights.length === 0 && <div className="ol-empty">No lights — click + to add one.</div>}
-          {proj.lights.map(l => {
-            const on = l.id === proj.activeLightId && st.ui.inspect === 'light';
+          {/* Ungrouped lights (manual + env) render flat; preset-added lights nest under a named sub-group. */}
+          {proj.lights.filter(l => !l.group).map(lightRow)}
+          {[...new Set(proj.lights.map(l => l.group).filter(Boolean) as string[])].map(g => {
+            const items = proj.lights.filter(l => l.group === g);
+            const gopen = openGroups[g] ?? true;
             return (
-              <div key={l.id} className={'ol-row' + (on ? ' sel' : '')} onClick={() => selectLight(l.id)}>
-                <span className="ol-ic" style={{ color: l.color }}><LightGlyph kind={l.kind} /></span>
-                <span className="nm">{l.name}</span>
-                <span className="ol-eye" title="Delete light" onClick={e => { e.stopPropagation(); removeLight(l.id); }}><IcTrash size={13} /></span>
-                <Eye id={lightHideKey(l.id)} />
+              <div key={g} className="ol-subgrp">
+                <div className="ol-row ol-subgrp-h" onClick={() => toggleGroup(g)} style={{ opacity: 0.95 }}>
+                  <Chevron open={gopen} />
+                  <span className="nm" style={{ fontWeight: 600 }}>{g}</span>
+                  <span className="ol-count" style={{ marginLeft: 6 }}>{items.length}</span>
+                  <span className="ol-eye" title="Delete this group" style={{ marginLeft: 'auto' }}
+                    onClick={e => { e.stopPropagation(); removeLightGroup(g); }}><IcTrash size={13} /></span>
+                </div>
+                {gopen && <div style={{ paddingLeft: 12 }}>{items.map(lightRow)}</div>}
               </div>
             );
           })}
