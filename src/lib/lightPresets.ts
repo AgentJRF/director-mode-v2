@@ -67,11 +67,11 @@ export const LIGHT_PRESETS: LightPreset[] = [
   },
   {
     // Low, warm side sun + warm fill + golden rim over a warm ambient — sunset mood.
-    kind: 'golden-hour', label: 'Golden hour', selectRole: 'key', envIntensity: 0.5, envColor: '#ffcf95',
+    kind: 'golden-hour', label: 'Golden hour', selectRole: 'key', envIntensity: 0.5, envColor: '#ffe2c2',
     lights: [
-      { role: 'key', kind: 'spot', az: 52, el: 12, distMul: 1.3, intensity: 13, color: '#ffb060', castShadow: true, angle: 0.7, penumbra: 0.5 },
-      { role: 'fill', kind: 'area', az: -48, el: 18, distMul: 1.35, intensity: 3, color: '#ffd9a8', castShadow: false, sizeMul: 1 },
-      { role: 'rim', kind: 'spot', az: 150, el: 34, distMul: 1.1, intensity: 9, color: '#ffcf80', castShadow: false, angle: 0.7, penumbra: 0.8 },
+      { role: 'key', kind: 'spot', az: 52, el: 12, distMul: 1.3, intensity: 13, color: '#ffca90', castShadow: true, angle: 0.7, penumbra: 0.5 },
+      { role: 'fill', kind: 'area', az: -48, el: 18, distMul: 1.35, intensity: 3, color: '#ffe6cf', castShadow: false, sizeMul: 1 },
+      { role: 'rim', kind: 'spot', az: 150, el: 34, distMul: 1.1, intensity: 9, color: '#ffd9a8', castShadow: false, angle: 0.7, penumbra: 0.8 },
     ],
   },
   {
