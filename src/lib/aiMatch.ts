@@ -3,6 +3,7 @@
 // endpoint (real Claude vision in `npm run dev`; absent on a static build) → local heuristic.
 import type { Vec3, Ease } from '../types';
 import type { LightPresetKind, LightPreset } from './lightPresets';
+import { LIGHT_PRESETS } from './lightPresets';
 
 // ---- image (camera pose) --------------------------------------------------
 export type ExactPose = { position: Vec3; rotation: Vec3; focal: number; aperture: number; focusPoint: Vec3 | null };
@@ -154,32 +155,82 @@ export async function matchLighting(p: { name?: string; metrics: LightingMetrics
   return (dev as LightingEstimate) ?? lightingHeuristic(p.metrics);
 }
 
-// Text → lighting. Wizard-of-Oz: score the prompt against each look's vocabulary and pick the best hit.
-// Returns a preset (or the bespoke golden-hour backlight rig) — always an editable rig, never a black box.
-const PROMPT_VOCAB: { est: () => LightingEstimate; words: string[] }[] = [
-  { est: () => ({ preset: 'neon', label: 'Neon', confidence: 0.8, mocked: true, reasoning: 'Prompt reads night / colour → saturated coloured key + rim over a dark ambient.' }),
-    words: ['neon', 'cyberpunk', 'night', 'club', 'bi-color', 'bicolor', 'bi color', 'teal', 'magenta', 'purple', 'blue hour', 'moody colour', 'colourful', 'colorful', 'synthwave'] },
-  { est: () => ({ ...GOLDEN_BACKLIT_EST, confidence: 0.82, mocked: true, reasoning: 'Prompt reads warm / sunset / backlit → low warm sun behind-left + warm bounce, golden ambient.' }),
-    words: ['golden', 'sunset', 'sunrise', 'warm', 'backlit', 'back light', 'backlight', 'rim', 'sun', 'outdoor', 'hour', 'amber', 'orange glow', 'hazy'] },
-  { est: () => ({ preset: 'dramatic', label: 'Dramatic', confidence: 0.8, mocked: true, reasoning: 'Prompt reads dark / hard / moody → single hard key with deep shadows (chiaroscuro).' }),
-    words: ['dramatic', 'moody', 'chiaroscuro', 'hard', 'contrast', 'dark', 'low key', 'low-key', 'noir', 'shadow', 'shadows', 'spotlight'] },
-  { est: () => ({ preset: 'softbox', label: 'Softbox', confidence: 0.8, mocked: true, reasoning: 'Prompt reads clean / soft / product → two big soft boxes, bright even ambient (packshot).' }),
-    words: ['softbox', 'soft', 'studio', 'packshot', 'product', 'ecommerce', 'e-commerce', 'clean', 'bright', 'even', 'white', 'catalog', 'catalogue', 'minimal'] },
-  { est: () => ({ preset: 'gobo', label: 'Gobo', confidence: 0.78, mocked: true, reasoning: 'Prompt reads patterned light → a gobo spot (blinds/window) plus a soft fill.' }),
-    words: ['gobo', 'blinds', 'window', 'pattern', 'dappled', 'venetian', 'shadow pattern', 'foliage', 'caustics', 'cookie'] },
-  { est: () => ({ preset: 'three-point', label: 'Three-point', confidence: 0.75, mocked: true, reasoning: 'Prompt reads balanced / neutral → a classic three-point rig (key + fill + rim).' }),
-    words: ['three-point', 'three point', '3-point', 'balanced', 'neutral', 'classic', 'standard', 'key fill rim', 'portrait'] },
+// Text → lighting. Wizard-of-Oz (offline, no LLM — the proto is a static share): pick the closest look
+// from a keyword vocabulary, THEN adjust that rig from modifier words (warm/cool, bright/dark,
+// soft/hard, strong/subtle). Always returns an editable declarative rig, never a black box.
+const preset = (k: LightPresetKind): LightPreset => LIGHT_PRESETS.find(p => p.kind === k)!;
+const PROMPT_LOOKS: { base: () => LightPreset; label: string; cue: string; words: string[] }[] = [
+  { base: () => preset('neon'), label: 'Neon', cue: 'night / colour',
+    words: ['neon', 'cyberpunk', 'night', 'club', 'bi-color', 'bicolor', 'bi color', 'teal', 'magenta', 'purple', 'synthwave', 'colourful', 'colorful'] },
+  { base: () => GOLDEN_BACKLIT, label: 'Golden hour', cue: 'warm / sunset / backlit',
+    words: ['golden', 'sunset', 'sunrise', 'backlit', 'back light', 'backlight', 'rim', 'sun', 'outdoor', 'hour', 'amber', 'hazy'] },
+  { base: () => preset('dramatic'), label: 'Dramatic', cue: 'hard / moody / low-key',
+    words: ['dramatic', 'moody', 'chiaroscuro', 'noir', 'low key', 'low-key', 'spotlight', 'single light', 'high contrast'] },
+  { base: () => preset('softbox'), label: 'Softbox', cue: 'clean / soft / product',
+    words: ['softbox', 'studio', 'packshot', 'product', 'ecommerce', 'e-commerce', 'clean', 'even', 'catalog', 'catalogue', 'minimal'] },
+  { base: () => preset('gobo'), label: 'Gobo', cue: 'patterned light',
+    words: ['gobo', 'blinds', 'window', 'pattern', 'dappled', 'venetian', 'foliage', 'caustics', 'cookie'] },
+  { base: () => preset('three-point'), label: 'Three-point', cue: 'balanced / neutral',
+    words: ['three-point', 'three point', '3-point', 'balanced', 'neutral', 'classic', 'standard', 'portrait'] },
 ];
+
+// Modifiers parsed from the prompt, each in [-1, 1] (0 = leave the base rig alone).
+type Mods = { warm: number; bright: number; soft: number; power: number };
+function parseMods(t: string): Mods {
+  const any = (arr: string[]) => arr.some(w => t.includes(w));
+  const d = (pos: string[], neg: string[]) => (any(pos) ? 1 : 0) - (any(neg) ? 1 : 0);
+  return {
+    warm: d(['warm', 'warmer', 'amber', 'golden', 'orange', 'cozy', 'sunset'], ['cool', 'cold', 'colder', 'blue', 'cyan', 'teal', 'icy', 'moonlight']),
+    bright: d(['bright', 'brighter', 'high key', 'high-key', 'airy', 'luminous', 'lit'], ['dark', 'darker', 'dim', 'dimmer', 'low key', 'low-key', 'moody', 'shadowy']),
+    soft: d(['soft', 'softer', 'diffuse', 'diffused', 'gentle', 'smooth', 'wrap'], ['hard', 'harder', 'sharp', 'crisp', 'harsh', 'punchy', 'defined']),
+    power: d(['strong', 'stronger', 'intense', 'powerful', 'bold', 'punchy'], ['subtle', 'faint', 'weak', 'delicate', 'gentle']),
+  };
+}
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+function mixHex(a: string, b: string, t: number): string {
+  const p = (h: string) => { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]; };
+  const [ar, ag, ab] = p(a), [br, bg, bb] = p(b);
+  const m = (x: number, y: number) => Math.round(x + (y - x) * t).toString(16).padStart(2, '0');
+  return '#' + m(ar, br) + m(ag, bg) + m(ab, bb);
+}
+const WARM = '#ffb060', COOL = '#bcd4ff';
+function adjustRig(base: LightPreset, m: Mods, label: string): LightPreset {
+  const lights = base.lights.map(s => {
+    let color = s.color;
+    if (m.warm !== 0) color = mixHex(s.color ?? '#ffffff', m.warm > 0 ? WARM : COOL, 0.35 * Math.abs(m.warm));
+    const gain = 1 + 0.25 * m.bright + 0.3 * m.power * (s.role === 'key' ? 1 : 0.4);
+    const intensity = +(s.intensity * gain).toFixed(1);
+    const penumbra = s.penumbra === undefined || m.soft === 0 ? s.penumbra : +clamp01(s.penumbra + 0.3 * m.soft).toFixed(2);
+    return { ...s, color, intensity, penumbra };
+  });
+  let envIntensity = base.envIntensity;
+  if (envIntensity !== undefined) envIntensity = +Math.max(0.02, envIntensity * (1 + 0.4 * m.bright)).toFixed(2);
+  let envColor = base.envColor;
+  if (m.warm !== 0) envColor = mixHex(envColor ?? '#ffffff', m.warm > 0 ? WARM : COOL, 0.3 * Math.abs(m.warm));
+  return { ...base, label, envIntensity, envColor, lights };
+}
+function describeMods(m: Mods): string {
+  const p: string[] = [];
+  if (m.warm) p.push(m.warm > 0 ? 'warmer' : 'cooler');
+  if (m.bright) p.push(m.bright > 0 ? 'brighter' : 'darker');
+  if (m.soft) p.push(m.soft > 0 ? 'softer' : 'harder');
+  if (m.power) p.push(m.power > 0 ? 'stronger key' : 'subtler key');
+  return p.length ? `Adjusted: ${p.join(', ')}.` : '';
+}
 export function lightingFromPrompt(text: string): LightingEstimate {
   const t = (text || '').toLowerCase();
-  let best: { est: () => LightingEstimate; score: number } | null = null;
-  for (const v of PROMPT_VOCAB) {
-    const score = v.words.reduce((n, w) => n + (t.includes(w) ? 1 : 0), 0);
-    if (score > 0 && (!best || score > best.score)) best = { est: v.est, score };
+  let best: { look: typeof PROMPT_LOOKS[number]; score: number } | null = null;
+  for (const look of PROMPT_LOOKS) {
+    const score = look.words.reduce((n, w) => n + (t.includes(w) ? 1 : 0), 0);
+    if (score > 0 && (!best || score > best.score)) best = { look, score };
   }
-  if (best) return best.est();
-  // Nothing recognised → a neutral three-point rig, flagged low-confidence.
-  return { preset: 'three-point', label: 'Three-point', confidence: 0.4, mocked: true, reasoning: 'No strong cue in the prompt → a neutral three-point rig. Add words like “dramatic”, “golden hour”, “neon”, “softbox”.' };
+  const look = best?.look ?? PROMPT_LOOKS[PROMPT_LOOKS.length - 1]; // default: three-point
+  const m = parseMods(t);
+  const rig = adjustRig(look.base(), m, look.label);
+  const mods = describeMods(m);
+  const head = best ? `Interpreted “${look.cue}” → ${look.label}.` : 'No strong style cue → neutral three-point.';
+  const confidence = best ? Math.min(0.9, 0.68 + best.score * 0.05) : 0.42;
+  return { preset: rig.kind, label: rig.label, confidence, mocked: true, rig, reasoning: `${head}${mods ? ' ' + mods : ''} Built as an editable rig — tweak after.` };
 }
 
 // Try the dev-server endpoint; returns null on a static host (no endpoint → HTML/404/network error).
