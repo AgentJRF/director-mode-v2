@@ -166,7 +166,7 @@ function tintEquirect(gl: THREE.WebGLRenderer, tex: THREE.Texture, colorHex: str
 //   • Effect B (re)builds the PMREM, tinting the source when Colorize is on.
 //   • Intensity + Y rotation are cheap live writes each frame. Hidden via the eye toggle (unmounted).
 function EnvNode({ light }: { light: Light }) {
-  const { gl, scene } = useThree();
+  const { gl, scene, invalidate } = useThree();
   const url = light.hdri;
   const ext = hdriExt(light.hdriName || url || '');
   const texRef = useRef<THREE.Texture | null>(null);
@@ -196,8 +196,9 @@ function EnvNode({ light }: { light: Light }) {
     const rt = pmrem.fromEquirectangular(tinted ? tinted.texture : tex);
     scene.environment = rt.texture;
     pmrem.dispose(); tinted?.dispose();
+    invalidate(); // demand frameloop: repaint so a colorize/tint change (e.g. from a preset) shows now
     return () => { scene.environment = null; rt.dispose(); };
-  }, [gl, scene, loaded, light.colorize, light.color]);
+  }, [gl, scene, invalidate, loaded, light.colorize, light.color]);
 
   useFrame(() => {
     scene.environmentIntensity = light.intensity;
