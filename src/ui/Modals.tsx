@@ -11,11 +11,18 @@ import type { Ease, Vec3 } from '../types';
 
 // Grab the current WebGL viewport as a data-URL (the Canvas runs with preserveDrawingBuffer:true).
 // Waits a beat so a just-applied state change has painted under the demand frameloop.
-const captureViewport = (): Promise<string | null> => new Promise(res => {
+const captureViewport = (delayMs = 180): Promise<string | null> => new Promise(res => {
   setTimeout(() => requestAnimationFrame(() => {
     const c = document.querySelector('#canvas-wrap canvas') as HTMLCanvasElement | null;
     res(c ? c.toDataURL('image/jpeg', 0.85) : null);
-  }), 180);
+  }), delayMs);
+});
+
+// Env maps load + build a PMREM asynchronously, so preload the source first, then capture the painted
+// frame. Gives the EnvNode effect (which shares the browser cache) time to finish before the snapshot.
+const captureAfterEnv = (url: string): Promise<string | null> => new Promise(res => {
+  const go = () => captureViewport(320).then(res);
+  const im = new Image(); im.onload = go; im.onerror = go; im.src = url;
 });
 
 // Wizard-of-Oz env "generation": a reference photo whose file-name matches → a real baked 360° pano
@@ -422,14 +429,48 @@ function AILightEnvModal() {
     im.src = url;
   };
   const baked = file && !file.wide ? bakedEnv(file.name) : null; // matched product ref → a real 360° pano (wizard-of-oz)
-  const apply = () => {
+  const [busy, setBusy] = useState(false);
+  const [shot, setShot] = useState<string | null>(null); // viewport WITH the env applied (side-by-side)
+  const [review, setReview] = useState(false);
+
+  const generate = async () => {
     if (!file) { S().toast('Upload an image first'); return; }
-    if (baked) { setEnvHdriFromImage(baked, 'mountain-sunset.png'); S().setModal(null); S().toast('Environment generated from reference'); }
-    else { setEnvHdriFromImage(file.url, file.name); S().setModal(null); S().toast('Environment built from image'); }
+    setBusy(true);
+    const src = baked ?? file.url; const nm = baked ? 'mountain-sunset.png' : file.name;
+    setEnvHdriFromImage(src, nm);          // apply to the live scene, then snapshot for the side-by-side
+    setShot(await captureAfterEnv(src));
+    setReview(true); setBusy(false);
   };
+  const keep = () => { S().setModal(null); S().toast(baked ? 'Environment generated from reference' : 'Environment built from image'); };
+  const back = () => { S().undo(); setReview(false); setShot(null); }; // revert the applied env
+
+  if (review && file) {
+    return (
+      <Shell title="AI review · Env light from image"
+        footer={<><button className="tbtn" onClick={back}>← Back</button><button className="tbtn primary" onClick={keep}>Keep environment</button></>}>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Reference</div>
+            <img src={file.url} alt="reference" style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Result · viewport</div>
+            {shot
+              ? <img src={shot} alt="viewport result" style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
+              : <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 6, border: '1px solid var(--line-2)', background: 'var(--panel-2)', display: 'grid', placeItems: 'center', color: 'var(--ink-2)', fontSize: 12 }}>Rendering…</div>}
+          </div>
+        </div>
+        <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--line-2)', borderRadius: 6, background: 'var(--panel-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 15 }}>Environment · IBL</div>
+          {baked && <span className="badge proto">generated 360°</span>}
+        </div>
+        <p className="hint" style={{ marginTop: 8 }}>The reference now drives the scene's reflections and ambient. Tune Intensity / Rotation on the Environment light. "← Back" reverts.</p>
+      </Shell>
+    );
+  }
   return (
     <Shell title="AI · Env light from image"
-      footer={<><button className="tbtn" onClick={() => S().setModal('ai')}>← Back</button><button className="tbtn primary" onClick={apply}>{baked ? 'Generate environment' : 'Build environment'}</button></>}>
+      footer={<><button className="tbtn" onClick={() => S().setModal('ai')}>← Back</button><button className="tbtn primary" onClick={generate}>{busy ? 'Generating…' : baked ? 'Generate environment' : 'Build environment'}</button></>}>
       <p className="hint" style={{ marginTop: 0 }}>Upload a reference image — it becomes the scene's environment (IBL) so the asset's reflections and ambient pick up its tones. Tune Intensity / Rotation afterwards on the Environment light. Equirectangular (360°) images map best.</p>
       {baked && <p className="hint" style={{ marginTop: 0 }}><span className="badge proto">AI</span> Recognised the scene — will generate a matching 360° environment (not just the flat photo).</p>}
       <label className="ai-drop">
