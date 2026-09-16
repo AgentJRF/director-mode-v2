@@ -80,7 +80,7 @@ function LightNode({ light }: { light: Light }) {
       const sp = shadowRef.current;
       if (sp) {
         sp.position.set(pose.position[0], pose.position[1], pose.position[2]); sp.target = target; sp.castShadow = !!l.castShadow;
-        sp.shadow.radius = Math.max(2, Math.min(30, (w + h) * 1.4)); // VSM blur ∝ emitter size
+        sp.shadow.radius = Math.max(3, Math.min(10, 2 + (w + h) * 0.6)); // VSM blur ∝ emitter size (kept modest — high radius leaks/bands)
       }
     }
     if (l.kind === 'spot') {
