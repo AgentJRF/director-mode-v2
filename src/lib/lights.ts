@@ -193,3 +193,17 @@ export function setLightKeysEase(ids: string[], ease: Ease) {
   l.keyframes.forEach(k => { if (ids.includes(k.id)) k.ease = ease; });
   st.bump();
 }
+// Replace one component of a light key's Vec3 value (Scene-view path handle drag) — mirrors setKeyValueComp.
+export function setLightKeyValueComp(id: string, i: number, v: number) {
+  const st = S(); const l = activeLight(); if (!l) return;
+  const k = l.keyframes.find(k => k.id === id);
+  if (k && Array.isArray(k.value)) { const nv = [...(k.value as Vec3)] as Vec3; nv[i] = v; k.value = nv; } // new ref so R3F consumers update
+  st.bump();
+}
+// Set/clear a light position key's Bézier tangent (Scene-view handle) — mirrors setKeyTangent (null = auto).
+export function setLightKeyTangent(id: string, which: 'in' | 'out', v: Vec3 | null) {
+  const st = S(); const l = activeLight(); if (!l) return;
+  const k = l.keyframes.find(k => k.id === id);
+  if (k) { const nv = v ? ([...v] as Vec3) : undefined; if (which === 'out') k.tangentOut = nv; else k.tangentIn = nv; }
+  st.bump();
+}

@@ -59,3 +59,6 @@ export function evalLight(light: Light, t: number): LightPose {
 }
 
 export const lightHasAnim = (light: Light) => light.keyframes.length > 0;
+
+// Position of a light at time t (spline-evaluated) — for the Scene-view path/handles (mirrors evalChannel).
+export const lightPosAt = (light: Light, t: number): Vec3 => evalLightChannel(light, 'position', t) as Vec3;
