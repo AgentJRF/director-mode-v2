@@ -3,7 +3,7 @@ import { S, PIVOT } from '../store';
 import MatchPreview, { MotionPreview } from '../three/MatchPreview';
 import { useRev } from './bits';
 import { evaluate, eulerFromLookAt, sphericalToPose, clamp } from '../lib/eval';
-import { matchCamera, matchMotion, matchLighting, type LightingMetrics, type LightingEstimate } from '../lib/aiMatch';
+import { matchCamera, matchMotion, matchLighting, lightingFromPrompt, type LightingMetrics, type LightingEstimate } from '../lib/aiMatch';
 import { fuseAB, applyMotionSpec, stepToPose, arcControls, type MotionSpec, type MotionStep } from '../lib/presets';
 import { applyLightPreset, applyRig } from '../lib/lightPresets';
 import { setEnvHdriFromImage } from '../lib/lights';
@@ -289,6 +289,7 @@ const AI_ICON = {
   film: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 4v16M16 4v16M4 9h4M4 15h4M16 9h4M16 15h4" /></svg>,
   rays: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3.4" /><path d="M12 3v2.6M12 18.4V21M3 12h2.6M18.4 12H21M5.6 5.6l1.9 1.9M16.5 16.5l1.9 1.9M18.4 5.6l-1.9 1.9M7.5 16.5l-1.9 1.9" /></svg>,
   globe: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5" /><ellipse cx="12" cy="12" rx="3.6" ry="8.5" /><path d="M3.5 12h17" /></svg>,
+  prompt: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M5 6h14M5 11h14M5 16h8" /><path d="M17.5 16.5l1.6 1.6 2.4-3.2" /></svg>,
 };
 
 // ✦ AI hub — one entry that groups the camera + lighting AI flows (tabbed). Each option opens its
@@ -320,6 +321,7 @@ function AIHubModal() {
           <Card icon={AI_ICON.film} title="From video" desc="Recreate a camera move from a clip as editable keyframes." onClick={() => S().setModal('ai-video')} />
         </>) : (<>
           <Card icon={AI_ICON.rays} title="Match reference" desc="Set up a matching light rig from a reference image." onClick={() => S().setModal('ai-light-match')} />
+          <Card icon={AI_ICON.prompt} title="From a prompt" desc="Describe the mood in words — get a matching light rig." onClick={() => S().setModal('ai-light-prompt')} />
           <Card icon={AI_ICON.globe} title="Env light from image" desc="Build an environment (IBL) so reflections match the asset." onClick={() => S().setModal('ai-light-env')} />
         </>)}
       </div>
@@ -410,6 +412,61 @@ function AILightMatchModal() {
           : <span style={{ color: 'var(--ink-2)' }}>⬆ Click to upload an image (JPG / PNG)</span>}
         <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => onFile(e.target.files?.[0])} />
       </label>
+    </Shell>
+  );
+}
+
+// ✦ AI · Lighting from a text prompt → an editable rig. Wizard-of-Oz: scores the prompt against each
+// look's vocabulary (see lightingFromPrompt) and applies the best match, then previews the result.
+function AILightPromptModal() {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [est, setEst] = useState<LightingEstimate | null>(null);
+  const [shot, setShot] = useState<string | null>(null);
+  const CHIPS = ['Dramatic side light, deep shadows', 'Golden hour, warm backlight', 'Neon night — teal & magenta', 'Clean studio packshot', 'Blinds gobo pattern'];
+
+  const generate = async () => {
+    if (!text.trim()) { S().toast('Describe the lighting first'); return; }
+    setBusy(true);
+    const e = lightingFromPrompt(text);
+    if (e.rig) applyRig(e.rig); else applyLightPreset(e.preset); // apply to the live scene, then snapshot
+    setShot(await captureViewport());
+    setEst(e); setBusy(false);
+  };
+  const keep = () => { if (!est) return; S().setModal(null); S().toast(`${est.label} lighting applied`); };
+  const back = () => { S().undo(); setEst(null); setShot(null); }; // revert the applied rig
+
+  if (est) {
+    return (
+      <Shell title="AI review · Lighting from prompt"
+        footer={<><button className="tbtn" onClick={back}>← Back</button><button className="tbtn primary" onClick={keep}>Keep lighting</button></>}>
+        <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Result · viewport</div>
+        {shot
+          ? <img src={shot} alt="viewport result" style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
+          : <div style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 6, border: '1px solid var(--line-2)', background: 'var(--panel-2)', display: 'grid', placeItems: 'center', color: 'var(--ink-2)', fontSize: 12 }}>Rendering…</div>}
+        <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--line-2)', borderRadius: 6, background: 'var(--panel-2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{est.label}</div>
+            {est.mocked && <span className="badge proto">interpreted</span>}
+          </div>
+          <div className="row" style={{ marginTop: 8 }}><label>Match</label><ConfBar c={est.confidence} /></div>
+        </div>
+        <p className="hint" style={{ marginTop: 8 }}><em>“{text}”</em></p>
+        <p className="hint" style={{ marginTop: 0 }}>{est.reasoning}</p>
+        <p className="hint">Applied as editable lights — replaced the working lights, kept the cameras + environment. "← Back" reverts.</p>
+      </Shell>
+    );
+  }
+  return (
+    <Shell title="AI · Lighting from prompt"
+      footer={<><button className="tbtn" onClick={() => S().setModal('ai')}>← Back</button><button className="tbtn primary" onClick={generate}>{busy ? 'Generating…' : 'Generate lighting'}</button></>}>
+      <p className="hint" style={{ marginTop: 0 }}>Describe the mood or style you want — the AI sets up a matching light rig you can tweak.</p>
+      <textarea value={text} onChange={e => setText(e.target.value)} rows={3} placeholder="e.g. dramatic side light with deep shadows, slightly warm"
+        style={{ width: '100%', resize: 'vertical', padding: 10, borderRadius: 8, border: '1px solid var(--line-2)', background: 'var(--panel-2)', color: 'var(--ink)', font: 'inherit' }} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+        {CHIPS.map(c => <button key={c} className="btn-sm" onClick={() => setText(c)}
+          style={{ padding: '4px 9px', borderRadius: 999, border: '1px solid var(--line-2)', background: 'var(--panel-2)', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 11.5 }}>{c}</button>)}
+      </div>
     </Shell>
   );
 }
@@ -542,6 +599,7 @@ export default function Modals() {
   if (m === 'ai-image') return <AIImageModal />;
   if (m === 'ai-video') return <AIVideoModal />;
   if (m === 'ai-light-match') return <AILightMatchModal />;
+  if (m === 'ai-light-prompt') return <AILightPromptModal />;
   if (m === 'ai-light-env') return <AILightEnvModal />;
   if (m === 'export') return <ExportModal />;
   return null;

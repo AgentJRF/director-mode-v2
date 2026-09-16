@@ -154,6 +154,34 @@ export async function matchLighting(p: { name?: string; metrics: LightingMetrics
   return (dev as LightingEstimate) ?? lightingHeuristic(p.metrics);
 }
 
+// Text → lighting. Wizard-of-Oz: score the prompt against each look's vocabulary and pick the best hit.
+// Returns a preset (or the bespoke golden-hour backlight rig) — always an editable rig, never a black box.
+const PROMPT_VOCAB: { est: () => LightingEstimate; words: string[] }[] = [
+  { est: () => ({ preset: 'neon', label: 'Neon', confidence: 0.8, mocked: true, reasoning: 'Prompt reads night / colour → saturated coloured key + rim over a dark ambient.' }),
+    words: ['neon', 'cyberpunk', 'night', 'club', 'bi-color', 'bicolor', 'bi color', 'teal', 'magenta', 'purple', 'blue hour', 'moody colour', 'colourful', 'colorful', 'synthwave'] },
+  { est: () => ({ ...GOLDEN_BACKLIT_EST, confidence: 0.82, mocked: true, reasoning: 'Prompt reads warm / sunset / backlit → low warm sun behind-left + warm bounce, golden ambient.' }),
+    words: ['golden', 'sunset', 'sunrise', 'warm', 'backlit', 'back light', 'backlight', 'rim', 'sun', 'outdoor', 'hour', 'amber', 'orange glow', 'hazy'] },
+  { est: () => ({ preset: 'dramatic', label: 'Dramatic', confidence: 0.8, mocked: true, reasoning: 'Prompt reads dark / hard / moody → single hard key with deep shadows (chiaroscuro).' }),
+    words: ['dramatic', 'moody', 'chiaroscuro', 'hard', 'contrast', 'dark', 'low key', 'low-key', 'noir', 'shadow', 'shadows', 'spotlight'] },
+  { est: () => ({ preset: 'softbox', label: 'Softbox', confidence: 0.8, mocked: true, reasoning: 'Prompt reads clean / soft / product → two big soft boxes, bright even ambient (packshot).' }),
+    words: ['softbox', 'soft', 'studio', 'packshot', 'product', 'ecommerce', 'e-commerce', 'clean', 'bright', 'even', 'white', 'catalog', 'catalogue', 'minimal'] },
+  { est: () => ({ preset: 'gobo', label: 'Gobo', confidence: 0.78, mocked: true, reasoning: 'Prompt reads patterned light → a gobo spot (blinds/window) plus a soft fill.' }),
+    words: ['gobo', 'blinds', 'window', 'pattern', 'dappled', 'venetian', 'shadow pattern', 'foliage', 'caustics', 'cookie'] },
+  { est: () => ({ preset: 'three-point', label: 'Three-point', confidence: 0.75, mocked: true, reasoning: 'Prompt reads balanced / neutral → a classic three-point rig (key + fill + rim).' }),
+    words: ['three-point', 'three point', '3-point', 'balanced', 'neutral', 'classic', 'standard', 'key fill rim', 'portrait'] },
+];
+export function lightingFromPrompt(text: string): LightingEstimate {
+  const t = (text || '').toLowerCase();
+  let best: { est: () => LightingEstimate; score: number } | null = null;
+  for (const v of PROMPT_VOCAB) {
+    const score = v.words.reduce((n, w) => n + (t.includes(w) ? 1 : 0), 0);
+    if (score > 0 && (!best || score > best.score)) best = { est: v.est, score };
+  }
+  if (best) return best.est();
+  // Nothing recognised → a neutral three-point rig, flagged low-confidence.
+  return { preset: 'three-point', label: 'Three-point', confidence: 0.4, mocked: true, reasoning: 'No strong cue in the prompt → a neutral three-point rig. Add words like “dramatic”, “golden hour”, “neon”, “softbox”.' };
+}
+
 // Try the dev-server endpoint; returns null on a static host (no endpoint → HTML/404/network error).
 async function tryJson(url: string, body: unknown): Promise<unknown> {
   try {

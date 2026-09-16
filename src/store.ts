@@ -5,7 +5,7 @@ import { clamp, eulerFromLookAt, evaluate, keysOf, poiPoint, round, uid, hasAnim
 import { makeLight } from './lib/lightRig';
 import { R3 } from './three/shared';
 
-export type ModalKind = null | 'interp' | 'ai' | 'ai-image' | 'ai-video' | 'ai-review-image' | 'ai-review-video' | 'ai-light-match' | 'ai-light-env' | 'export';
+export type ModalKind = null | 'interp' | 'ai' | 'ai-image' | 'ai-video' | 'ai-review-image' | 'ai-review-video' | 'ai-light-match' | 'ai-light-prompt' | 'ai-light-env' | 'export';
 
 // Shared orbit pivot (product center); updated when the asset loads.
 export const PIVOT = new THREE.Vector3(0, 0.9, 0);
