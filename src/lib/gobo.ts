@@ -180,11 +180,12 @@ export function goboImageCanvasTexture(g: LightGobo, url: string, onReady?: () =
   const x = c.getContext('2d')!;
   x.fillStyle = '#ffffff'; x.fillRect(0, 0, SIZE, SIZE);   // white base = light passes
   const blur = (1 - (g.sharpness ?? 0.85)) * 12;           // Softness → edge feather
-  x.filter = blur ? `blur(${blur}px)` : 'none';
+  // Contrast is a real contrast() curve (not just a white wash): image gobos ship low-contrast, so the
+  // default (1) already punches the pattern up so it reads; lower values flatten it toward mid-gray.
+  const ctr = 0.6 + (g.contrast ?? 1) * 1.6;               // 0 → 0.6 (flat), 1 → 2.2 (punchy)
+  x.filter = `${blur ? `blur(${blur}px) ` : ''}contrast(${ctr.toFixed(2)})`;
   x.drawImage(img, 0, 0, SIZE, SIZE);
   x.filter = 'none';
-  const wash = 1 - (g.contrast ?? 1);                       // Contrast down → fade the pattern toward white
-  if (wash > 0) { x.globalAlpha = wash; x.fillStyle = '#ffffff'; x.fillRect(0, 0, SIZE, SIZE); x.globalAlpha = 1; }
   const tex = new THREE.CanvasTexture(applyGoboTransform(c, g.size, g.rotation)); // bake Scale + Rotation
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
