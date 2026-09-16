@@ -44,6 +44,8 @@ function PresetScene({ preset }: { preset: LightPreset }) {
   const src = pattern ? goboSphereThumb(pattern) : null;
   // A gobo card is about the projected pattern — show only the gobo-carrying light(s), not the fill.
   const shown = pattern ? preset.lights.filter(l => l.gobo) : preset.lights;
+  // Coloured lights tint the sphere from their own direction (warm for golden hour, teal/magenta for neon).
+  const tinted = shown.filter(l => l.color);
 
   return (
     <svg viewBox="12 8 176 123.2" width="100%" style={{ display: 'block', background: '#17181c', borderRadius: 7 }}
@@ -56,6 +58,15 @@ function PresetScene({ preset }: { preset: LightPreset }) {
           <stop offset="100%" stopColor="#33353a" />
         </radialGradient>
         <clipPath id={clip}><circle cx={CX} cy={CY} r={R} /></clipPath>
+        {tinted.map((l, i) => {
+          const d = dirOf(l); const tcx = 0.5 + d[0] * 0.32, tcy = 0.5 - d[1] * 0.32;
+          return (
+            <radialGradient key={i} id={`tint-${preset.kind}-${i}`} cx={tcx} cy={tcy} r="0.85">
+              <stop offset="0%" stopColor={l.color} stopOpacity={l.role === 'key' ? 0.5 : 0.4} />
+              <stop offset="72%" stopColor={l.color} stopOpacity="0" />
+            </radialGradient>
+          );
+        })}
       </defs>
 
       <ellipse cx={CX} cy={116} rx={90} ry={16} fill="#202127" />
@@ -74,9 +85,9 @@ function PresetScene({ preset }: { preset: LightPreset }) {
         ].map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
         return (
           <g key={'b' + i} opacity={behind ? 0.45 : 1}>
-            <polygon points={poly} fill={ROLE_COLOR[l.role]} opacity={behind ? 0.07 : 0.16} />
+            <polygon points={poly} fill={l.color ?? ROLE_COLOR[l.role]} opacity={behind ? 0.07 : 0.16} />
             <line x1={gx.toFixed(1)} y1={gy.toFixed(1)} x2={(nearX).toFixed(1)} y2={(nearY).toFixed(1)}
-              stroke={ROLE_COLOR[l.role]} strokeWidth={1.3} opacity={behind ? 0.35 : 0.7}
+              stroke={l.color ?? ROLE_COLOR[l.role]} strokeWidth={1.3} opacity={behind ? 0.35 : 0.7}
               strokeDasharray={behind ? '3 3' : undefined} />
           </g>
         );
@@ -84,6 +95,8 @@ function PresetScene({ preset }: { preset: LightPreset }) {
 
       {/* the gray asset sphere */}
       <circle cx={CX} cy={CY} r={R} fill={`url(#${gid})`} />
+      {/* colour wash from each coloured light (mood tint) */}
+      {tinted.map((l, i) => <circle key={'t' + i} cx={CX} cy={CY} r={R} fill={`url(#tint-${preset.kind}-${i})`} clipPath={`url(#${clip})`} />)}
       {/* gobo pattern projected on the sphere (monochrome, multiplied) */}
       {src && <image href={src} x={CX - R} y={CY - R} width={R * 2} height={R * 2} preserveAspectRatio="xMidYMid slice"
         clipPath={`url(#${clip})`} style={{ mixBlendMode: 'multiply' }} opacity="0.9" />}
@@ -94,7 +107,7 @@ function PresetScene({ preset }: { preset: LightPreset }) {
       {/* lamp glyphs at their real placement */}
       {shown.map((l, i) => {
         const { gx, gy, behind } = project(dirOf(l));
-        const col = ROLE_COLOR[l.role];
+        const col = l.color ?? ROLE_COLOR[l.role];
         return (
           <g key={'g' + i} opacity={behind ? 0.7 : 1}>
             {[0, 45, 90, 135, 180, 225, 270, 315].map(a => {

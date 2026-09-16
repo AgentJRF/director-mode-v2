@@ -12,7 +12,7 @@ import { S, PIVOT } from '../store';
 // OBJECT_FRAME.product, so a rig auto-scales to the loaded asset. Applying REPLACES the working
 // lights but keeps the Environment (IBL).
 
-export type LightPresetKind = 'three-point' | 'gobo';
+export type LightPresetKind = 'three-point' | 'gobo' | 'golden-hour' | 'softbox' | 'dramatic' | 'neon';
 export type LightRole = 'key' | 'fill' | 'rim';
 
 export interface PresetLightSpec {
@@ -26,6 +26,7 @@ export interface PresetLightSpec {
   angle?: number;      // spot cone half-angle (rad)
   penumbra?: number;   // spot edge softness
   sizeMul?: number;    // area emitter size = OBJECT_FRAME.product · sizeMul
+  color?: string;      // light colour (hex) — defaults to white when omitted
   gobo?: Partial<LightGobo>; // spot only — projects a gobo/cookie (seeded from defaultGobo)
 }
 
@@ -34,6 +35,7 @@ export interface LightPreset {
   label: string;
   selectRole: LightRole;   // which light to select after applying
   envIntensity?: number;   // dim the environment/IBL to this level so the rig reads (undefined = leave it)
+  envColor?: string;       // tint the environment (IBL) this colour for ambient mood (enables colorize)
   lights: PresetLightSpec[];
 }
 
@@ -63,6 +65,40 @@ export const LIGHT_PRESETS: LightPreset[] = [
       { role: 'fill', kind: 'area', az: -46, el: 14, distMul: 1.35, intensity: 2.5, castShadow: false, sizeMul: 0.9 },
     ],
   },
+  {
+    // Low, warm side sun + warm fill + golden rim over a warm ambient — sunset mood.
+    kind: 'golden-hour', label: 'Golden hour', selectRole: 'key', envIntensity: 0.5, envColor: '#ffcf95',
+    lights: [
+      { role: 'key', kind: 'spot', az: 52, el: 12, distMul: 1.3, intensity: 13, color: '#ffb060', castShadow: true, angle: 0.7, penumbra: 0.5 },
+      { role: 'fill', kind: 'area', az: -48, el: 18, distMul: 1.35, intensity: 3, color: '#ffd9a8', castShadow: false, sizeMul: 1 },
+      { role: 'rim', kind: 'spot', az: 150, el: 34, distMul: 1.1, intensity: 9, color: '#ffcf80', castShadow: false, angle: 0.7, penumbra: 0.8 },
+    ],
+  },
+  {
+    // Two big soft boxes + gentle rim, brighter neutral ambient — clean e-commerce packshot.
+    kind: 'softbox', label: 'Softbox', selectRole: 'key', envIntensity: 0.6,
+    lights: [
+      { role: 'key', kind: 'area', az: 32, el: 28, distMul: 1.25, intensity: 5, castShadow: true, sizeMul: 1.3 },
+      { role: 'fill', kind: 'area', az: -36, el: 20, distMul: 1.3, intensity: 4, castShadow: false, sizeMul: 1.3 },
+      { role: 'rim', kind: 'spot', az: 165, el: 40, distMul: 1.1, intensity: 4, castShadow: false, angle: 0.8, penumbra: 1 },
+    ],
+  },
+  {
+    // Single hard key at 45° + faint rim, near-black ambient — chiaroscuro / deep shadows.
+    kind: 'dramatic', label: 'Dramatic', selectRole: 'key', envIntensity: 0.1,
+    lights: [
+      { role: 'key', kind: 'spot', az: 45, el: 42, distMul: 1.15, intensity: 17, castShadow: true, angle: 0.5, penumbra: 0.12 },
+      { role: 'rim', kind: 'spot', az: 168, el: 30, distMul: 1.1, intensity: 6, castShadow: false, angle: 0.7, penumbra: 1 },
+    ],
+  },
+  {
+    // Teal key + magenta rim over a dark cool ambient — stylised neon night look (shows off colour).
+    kind: 'neon', label: 'Neon', selectRole: 'key', envIntensity: 0.14, envColor: '#20304a',
+    lights: [
+      { role: 'key', kind: 'spot', az: 34, el: 26, distMul: 1.2, intensity: 11, color: '#22d3ee', castShadow: true, angle: 0.7, penumbra: 0.5 },
+      { role: 'rim', kind: 'spot', az: 158, el: 34, distMul: 1.1, intensity: 13, color: '#ff4fd8', castShadow: false, angle: 0.7, penumbra: 0.8 },
+    ],
+  },
 ];
 
 const roleName = (r: LightRole) => r.charAt(0).toUpperCase() + r.slice(1);
@@ -89,6 +125,7 @@ function buildLight(spec: PresetLightSpec, R: number): Light {
   };
   if (spec.kind === 'spot') { over.angle = spec.angle ?? 0.6; over.penumbra = spec.penumbra ?? 0.5; }
   if (spec.kind === 'area') { const s = R * (spec.sizeMul ?? 0.9); over.width = +s.toFixed(2); over.height = +s.toFixed(2); }
+  if (spec.color) over.color = spec.color;
   if (spec.gobo) over.gobo = { ...defaultGobo(), ...spec.gobo };
   return makeLight(spec.kind, roleName(spec.role), over);
 }
@@ -103,7 +140,12 @@ export function applyLightPreset(kind: LightPresetKind) {
 
   // Replace the working lights, KEEP the environment/IBL (and cameras, untouched).
   const env = p.lights.filter(l => l.kind === 'env');
-  if (preset.envIntensity !== undefined) env.forEach(e => { e.intensity = preset.envIntensity!; });
+  env.forEach(e => {
+    if (preset.envIntensity !== undefined) e.intensity = preset.envIntensity;
+    // Tint the IBL for mood (golden/neon), or clear a previous preset's tint back to neutral.
+    if (preset.envColor) { e.color = preset.envColor; e.colorize = true; }
+    else e.colorize = false;
+  });
   p.lights = [...env, ...rig];
   const sel = rig[preset.lights.findIndex(s => s.role === preset.selectRole)] ?? rig[0];
   p.activeLightId = sel.id; st.ui.inspect = 'light';
