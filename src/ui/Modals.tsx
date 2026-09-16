@@ -18,6 +18,15 @@ const captureViewport = (): Promise<string | null> => new Promise(res => {
   }), 180);
 });
 
+// Wizard-of-Oz env "generation": a reference photo whose file-name matches → a real baked 360° pano
+// (in public/env) instead of stretching the flat photo across the sphere. Keyed like the other AI demos.
+const ENV_DEMO: [string, string][] = [
+  ['backpack', '/env/mountain-sunset.jpg'], ['lowepro', '/env/mountain-sunset.jpg'], ['protactic', '/env/mountain-sunset.jpg'],
+  ['mountain', '/env/mountain-sunset.jpg'], ['sunset', '/env/mountain-sunset.jpg'], ['golden', '/env/mountain-sunset.jpg'],
+  ['outdoor', '/env/mountain-sunset.jpg'], ['hike', '/env/mountain-sunset.jpg'],
+];
+const bakedEnv = (name: string): string | null => { const n = name.toLowerCase(); return ENV_DEMO.find(([k]) => n.includes(k))?.[1] ?? null; };
+
 function Shell({ title, children, footer }: { title: string; children: React.ReactNode; footer: React.ReactNode }) {
   return (
     <div className="scrim" onClick={e => { if (e.target === e.currentTarget) S().setModal(null); }}>
@@ -402,14 +411,17 @@ function AILightMatchModal() {
 function AILightEnvModal() {
   const [file, setFile] = useState<{ url: string; name: string } | null>(null);
   const onFile = (f?: File) => { if (!f) return; setFile({ url: URL.createObjectURL(f), name: f.name }); };
+  const baked = file ? bakedEnv(file.name) : null; // matched reference → a real 360° pano (wizard-of-oz)
   const apply = () => {
     if (!file) { S().toast('Upload an image first'); return; }
-    setEnvHdriFromImage(file.url, file.name); S().setModal(null); S().toast('Environment built from image');
+    if (baked) { setEnvHdriFromImage(baked, 'mountain-sunset.jpg'); S().setModal(null); S().toast('Environment generated from reference'); }
+    else { setEnvHdriFromImage(file.url, file.name); S().setModal(null); S().toast('Environment built from image'); }
   };
   return (
     <Shell title="AI · Env light from image"
-      footer={<><button className="tbtn" onClick={() => S().setModal('ai')}>← Back</button><button className="tbtn primary" onClick={apply}>Build environment</button></>}>
+      footer={<><button className="tbtn" onClick={() => S().setModal('ai')}>← Back</button><button className="tbtn primary" onClick={apply}>{baked ? 'Generate environment' : 'Build environment'}</button></>}>
       <p className="hint" style={{ marginTop: 0 }}>Upload a reference image — it becomes the scene's environment (IBL) so the asset's reflections and ambient pick up its tones. Tune Intensity / Rotation afterwards on the Environment light. Equirectangular (360°) images map best.</p>
+      {baked && <p className="hint" style={{ marginTop: 0 }}><span className="badge proto">AI</span> Recognised the scene — will generate a matching 360° environment (not just the flat photo).</p>}
       <label className="ai-drop">
         {file ? <img src={file.url} alt="reference" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 6 }} />
           : <span style={{ color: 'var(--ink-2)' }}>⬆ Click to upload an image (JPG / PNG)</span>}
