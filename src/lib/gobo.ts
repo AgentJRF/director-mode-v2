@@ -170,6 +170,29 @@ function loadGoboImage(url: string, onReady?: () => void): HTMLImageElement | nu
   return null;
 }
 
+// Per-image contrast stretch (auto-levels) done in place on a 2D context. `amount` (0..1) sets how much
+// of the tonal range is clipped: black point = the `amount·22%` darkest pixels, white point = the
+// `amount·3%` brightest. amount 0 leaves the image untouched. Adapts to each image's own tonality.
+function autoLevels(x: CanvasRenderingContext2D, amount: number) {
+  if (amount <= 0) return;
+  const id = x.getImageData(0, 0, SIZE, SIZE), p = id.data, N = SIZE * SIZE;
+  const hist = new Array(256).fill(0);
+  for (let i = 0; i < p.length; i += 4) hist[(p[i] * 0.299 + p[i + 1] * 0.587 + p[i + 2] * 0.114) | 0]++;
+  const loCut = amount * 0.22 * N, hiCut = amount * 0.03 * N;
+  let lo = 0, hi = 255, acc = 0;
+  for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= loCut) { lo = v; break; } }
+  acc = 0;
+  for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= hiCut) { hi = v; break; } }
+  if (hi <= lo) hi = lo + 1;
+  const scale = 255 / (hi - lo);
+  for (let i = 0; i < p.length; i += 4) {
+    const lum = p[i] * 0.299 + p[i + 1] * 0.587 + p[i + 2] * 0.114;
+    let o = (lum - lo) * scale; o = o < 0 ? 0 : o > 255 ? 255 : o;
+    p[i] = p[i + 1] = p[i + 2] = o;
+  }
+  x.putImageData(id, 0, 0);
+}
+
 // An image-backed gobo baked to a canvas so Softness (blur) and Contrast behave exactly like the
 // procedural patterns. Rebuilt whenever pattern/sharpness/contrast change (SceneLights' memo deps).
 // Returns null until the source image has loaded (then onReady triggers a rebuild).
@@ -180,12 +203,15 @@ export function goboImageCanvasTexture(g: LightGobo, url: string, onReady?: () =
   const x = c.getContext('2d')!;
   x.fillStyle = '#ffffff'; x.fillRect(0, 0, SIZE, SIZE);   // white base = light passes
   const blur = (1 - (g.sharpness ?? 0.85)) * 12;           // Softness → edge feather
-  // Contrast is a real contrast() curve (not just a white wash): image gobos ship low-contrast, so the
-  // default (1) already punches the pattern up so it reads; lower values flatten it toward mid-gray.
-  const ctr = 0.6 + (g.contrast ?? 1) * 1.6;               // 0 → 0.6 (flat), 1 → 2.2 (punchy)
-  x.filter = `${blur ? `blur(${blur}px) ` : ''}contrast(${ctr.toFixed(2)})`;
+  x.filter = blur ? `blur(${blur}px)` : 'none';
   x.drawImage(img, 0, 0, SIZE, SIZE);
   x.filter = 'none';
+  // Auto-levels (per-image contrast stretch). Image gobos ship low-contrast and with very different
+  // tonalities (foliage = pale, mid-gray leaves on white; caustics = bright ripples on dark), so a fixed
+  // curve can't serve both. We stretch each image between percentile black/white points; Contrast drives
+  // how aggressive that stretch is — at the default it clearly darkens the pattern so it reads, at 0 it's
+  // left raw. This is what makes the (otherwise faint) foliage gobo visible by default.
+  autoLevels(x, Math.max(0, Math.min(1, g.contrast ?? 1)));
   const tex = new THREE.CanvasTexture(applyGoboTransform(c, g.size, g.rotation)); // bake Scale + Rotation
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
