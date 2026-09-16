@@ -409,9 +409,18 @@ function AILightMatchModal() {
 // ✦ AI · Env light from a reference image → sets the scene's environment (IBL) to that image so the
 // asset's reflections + ambient pick up its tones. (Wizard-of-Oz: the image is used directly as the env.)
 function AILightEnvModal() {
-  const [file, setFile] = useState<{ url: string; name: string } | null>(null);
-  const onFile = (f?: File) => { if (!f) return; setFile({ url: URL.createObjectURL(f), name: f.name }); };
-  const baked = file ? bakedEnv(file.name) : null; // matched reference → a real 360° pano (wizard-of-oz)
+  const [file, setFile] = useState<{ url: string; name: string; wide: boolean } | null>(null);
+  const onFile = (f?: File) => {
+    if (!f) return;
+    const url = URL.createObjectURL(f);
+    const im = new Image();
+    // A wide image is already an equirect pano → use it directly. Only a non-pano product photo
+    // triggers the baked "generation" (which needs a pano in public/env).
+    im.onload = () => setFile({ url, name: f.name, wide: im.naturalWidth / im.naturalHeight >= 1.7 });
+    im.onerror = () => setFile({ url, name: f.name, wide: false });
+    im.src = url;
+  };
+  const baked = file && !file.wide ? bakedEnv(file.name) : null; // matched product ref → a real 360° pano (wizard-of-oz)
   const apply = () => {
     if (!file) { S().toast('Upload an image first'); return; }
     if (baked) { setEnvHdriFromImage(baked, 'mountain-sunset.jpg'); S().setModal(null); S().toast('Environment generated from reference'); }
