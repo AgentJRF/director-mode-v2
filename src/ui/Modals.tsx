@@ -5,7 +5,7 @@ import { useRev } from './bits';
 import { evaluate, eulerFromLookAt, sphericalToPose, clamp } from '../lib/eval';
 import { matchCamera, matchMotion, matchLighting, type LightingMetrics, type LightingEstimate } from '../lib/aiMatch';
 import { fuseAB, applyMotionSpec, stepToPose, arcControls, type MotionSpec, type MotionStep } from '../lib/presets';
-import { applyLightPreset } from '../lib/lightPresets';
+import { applyLightPreset, applyRig } from '../lib/lightPresets';
 import { setEnvHdriFromImage } from '../lib/lights';
 import type { Ease, Vec3 } from '../types';
 
@@ -337,7 +337,7 @@ function AILightMatchModal() {
     catch { S().toast('AI request failed'); }
     setBusy(false);
   };
-  const apply = () => { if (!est) return; applyLightPreset(est.preset); S().setModal(null); S().toast(`${est.label} lighting applied`); };
+  const apply = () => { if (!est) return; if (est.rig) applyRig(est.rig); else applyLightPreset(est.preset); S().setModal(null); S().toast(`${est.label} lighting applied`); };
 
   if (est && img) {
     return (

@@ -2,7 +2,7 @@
 // works on a static host (Vercel). Order for each: baked pose (by file-name substring) → dev-server
 // endpoint (real Claude vision in `npm run dev`; absent on a static build) → local heuristic.
 import type { Vec3, Ease } from '../types';
-import type { LightPresetKind } from './lightPresets';
+import type { LightPresetKind, LightPreset } from './lightPresets';
 
 // ---- image (camera pose) --------------------------------------------------
 export type ExactPose = { position: Vec3; rotation: Vec3; focal: number; aperture: number; focusPoint: Vec3 | null };
@@ -99,11 +99,34 @@ export async function matchMotion(name: string): Promise<MotionEstimateT> {
 
 // ---- lighting (match a reference image → a light rig / preset) -------------
 export type LightingMetrics = { lum: number; warmth: number; sat: number }; // 0..1 luminance, -1..1 warm-cool, 0..1 saturation
-export type LightingEstimate = { preset: LightPresetKind; label: string; confidence: number; reasoning: string; mocked?: boolean };
+// A matched estimate can carry a BESPOKE rig (built to fit the reference) rather than a named preset.
+// When `rig` is present the modal applies it verbatim; otherwise it falls back to the named `preset`.
+export type LightingEstimate = { preset: LightPresetKind; label: string; confidence: number; reasoning: string; mocked?: boolean; rig?: LightPreset };
+
+// Bespoke rig reconstructed from a warm, low-sun BACKLIT reference (e.g. a product shot at golden hour):
+// the sun sits low and BEHIND-LEFT (strong rim + long shadow toward camera), a warm ground-bounce fill
+// opens the shaded face, a second warm kicker catches the near top edge, over a bright warm ambient.
+const GOLDEN_BACKLIT: LightPreset = {
+  kind: 'golden-hour', label: 'Golden hour (matched)', selectRole: 'key',
+  envIntensity: 0.55, envColor: '#ffd7a1',
+  lights: [
+    // Sun — low, warm, behind-left: reads as a bright rim on the near edge + a long cast shadow.
+    { role: 'key', kind: 'spot', az: -152, el: 10, distMul: 1.4, intensity: 18, color: '#ff9a4d', castShadow: true, angle: 0.62, penumbra: 0.7 },
+    // Warm bounce fill — front-left, soft, low: lifts the shaded face like grass/ground bounce.
+    { role: 'fill', kind: 'area', az: -28, el: 12, distMul: 1.3, intensity: 3.2, color: '#ffca99', castShadow: false, sizeMul: 1 },
+    // Warm kicker — high behind-left: extra glow on the top/near edge the sun grazes.
+    { role: 'rim', kind: 'spot', az: -118, el: 30, distMul: 1.15, intensity: 8, color: '#ffb877', castShadow: false, angle: 0.7, penumbra: 0.9 },
+  ],
+};
+const GOLDEN_BACKLIT_EST: LightingEstimate = {
+  preset: 'golden-hour', label: 'Golden hour (matched)', confidence: 0.9, rig: GOLDEN_BACKLIT,
+  reasoning: 'Warm, low sun behind-left → strong rim + long shadow, warm ground bounce on the shaded face, bright golden ambient. Rig built to match the reference, not a stock preset.',
+};
 
 const LIGHTING_DEMO: [string, LightingEstimate][] = [
-  ['sunset', { preset: 'golden-hour', label: 'Golden hour', confidence: 0.9, reasoning: 'Warm, low-angle key with a golden ambient — classic sunset cast.' }],
-  ['golden', { preset: 'golden-hour', label: 'Golden hour', confidence: 0.9, reasoning: 'Warm directional key + warm ambient.' }],
+  ['backpack', GOLDEN_BACKLIT_EST], ['lowepro', GOLDEN_BACKLIT_EST], ['protactic', GOLDEN_BACKLIT_EST],
+  ['mountain', GOLDEN_BACKLIT_EST], ['outdoor', GOLDEN_BACKLIT_EST], ['hike', GOLDEN_BACKLIT_EST],
+  ['sunset', GOLDEN_BACKLIT_EST], ['golden', GOLDEN_BACKLIT_EST],
   ['neon', { preset: 'neon', label: 'Neon', confidence: 0.88, reasoning: 'Saturated coloured key/rim over a dark ambient — night/neon look.' }],
   ['studio', { preset: 'softbox', label: 'Softbox', confidence: 0.86, reasoning: 'Bright, even, soft light — clean studio packshot.' }],
   ['dramatic', { preset: 'dramatic', label: 'Dramatic', confidence: 0.85, reasoning: 'Single hard key, deep shadows — chiaroscuro.' }],
@@ -116,7 +139,8 @@ function lightingHeuristic(m: LightingMetrics): LightingEstimate {
   let preset: LightPresetKind; let why: string;
   if (m.sat > 0.5 && m.lum < 0.6) { preset = 'neon'; why = 'Saturated colours over darker midtones → coloured key/rim (neon).'; }
   else if (m.lum < 0.32) { preset = 'dramatic'; why = 'Low-key, high-contrast reference → single hard key with deep shadows.'; }
-  else if (m.warmth > 0.14) { preset = 'golden-hour'; why = 'Warm cast → low warm key + warm ambient (golden hour).'; }
+  // Warm tone → reconstruct the bespoke golden-hour BACKLIGHT rig (not the flat preset) to match the image.
+  else if (m.warmth > 0.14) { return { ...GOLDEN_BACKLIT_EST, confidence: 0.6, mocked: true, reasoning: 'Warm image tone → reconstructed a golden-hour backlight rig (low warm sun behind-left + warm bounce). Tweak the lights after.' }; }
   else if (m.lum > 0.62 && m.sat < 0.35) { preset = 'softbox'; why = 'Bright, even, low-saturation reference → soft studio boxes.'; }
   else { preset = 'three-point'; why = 'Balanced reference → a neutral three-point rig.'; }
   return { preset, label: LABEL[preset], confidence: 0.55, reasoning: why + ' Estimated from the image tone — tweak the lights after.', mocked: true };

@@ -131,15 +131,14 @@ function buildLight(spec: PresetLightSpec, R: number): Light {
   return makeLight(spec.kind, roleName(spec.role), over);
 }
 
-export function applyLightPreset(kind: LightPresetKind) {
+// Apply ANY declarative rig (built-in preset OR a bespoke one, e.g. from the AI match).
+// Replaces the working lights, KEEPS the environment/IBL (and cameras, untouched).
+export function applyRig(preset: LightPreset) {
   const st = S(); const p = st.project;
-  const preset = LIGHT_PRESETS.find(x => x.kind === kind);
-  if (!preset) return;
   const R = OBJECT_FRAME.product || 6;
 
   const rig = preset.lights.map(spec => buildLight(spec, R));
 
-  // Replace the working lights, KEEP the environment/IBL (and cameras, untouched).
   const env = p.lights.filter(l => l.kind === 'env');
   env.forEach(e => {
     if (preset.envIntensity !== undefined) e.intensity = preset.envIntensity;
@@ -151,4 +150,9 @@ export function applyLightPreset(kind: LightPresetKind) {
   const sel = rig[preset.lights.findIndex(s => s.role === preset.selectRole)] ?? rig[0];
   p.activeLightId = sel.id; st.ui.inspect = 'light';
   st.bump(); st.toast(`${preset.label} lighting applied`);
+}
+
+export function applyLightPreset(kind: LightPresetKind) {
+  const preset = LIGHT_PRESETS.find(x => x.kind === kind);
+  if (preset) applyRig(preset);
 }
