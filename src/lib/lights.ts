@@ -187,3 +187,9 @@ export function removeLightKey(id: string) {
   const st = S(); const l = activeLight(); if (!l) return;
   l.keyframes = l.keyframes.filter(k => k.id !== id); st.bump();
 }
+// Set the ease (speed curve) on the given keys of the active light — mirrors the camera's setKeysEase.
+export function setLightKeysEase(ids: string[], ease: Ease) {
+  const st = S(); const l = activeLight(); if (!l) return;
+  l.keyframes.forEach(k => { if (ids.includes(k.id)) k.ease = ease; });
+  st.bump();
+}

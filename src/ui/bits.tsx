@@ -1,7 +1,8 @@
 import { useStore } from '../store';
 import { useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { round, clamp } from '../lib/eval';
+import { round, clamp, EASES } from '../lib/eval';
+import type { Ease } from '../types';
 
 // re-render helper: subscribe to the store revision counter
 export const useRev = () => useStore(s => s.rev);
@@ -46,5 +47,20 @@ export function NumInput({ value, min, max, step, dec, onChange }:
       onPointerDown={makeScrub(round(value, dec), step, dec, onChange, min, max)}
       onChange={e => setTxt(e.target.value)} onBlur={commit}
       onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setTxt(null); }} />
+  );
+}
+
+// A small speed-curve diagram for an ease (shared by the camera + light "speed curve presets").
+export function EaseCurve({ ease }: { ease: Ease }) {
+  const fn = EASES[ease] || EASES.linear; let d = ''; const N = 48;
+  for (let i = 0; i <= N; i++) { const t = i / N; const y = fn(t); d += (i ? 'L' : 'M') + (t * 100).toFixed(1) + ',' + (100 - y * 100).toFixed(1) + ' '; }
+  return (
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height={128}
+      style={{ display: 'block', background: 'var(--panel)', border: '1px solid var(--line-2)', borderRadius: 6, marginTop: 8 }}>
+      <line x1="0" y1="50" x2="100" y2="50" stroke="#1c2024" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />
+      <line x1="50" y1="0" x2="50" y2="100" stroke="#1c2024" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />
+      <path d={`${d} L100,100 L0,100 Z`} fill="rgba(242,163,60,0.14)" stroke="none" />
+      <path d={d} fill="none" stroke="#f2a33c" strokeWidth={2.5} vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }

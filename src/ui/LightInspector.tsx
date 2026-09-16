@@ -1,17 +1,17 @@
 import { S } from '../store';
-import { useRev, NumInput } from './bits';
+import { useRev, NumInput, EaseCurve } from './bits';
 import { evalLight, lightPoi } from '../lib/lightEval';
 import {
   activeLight, lightKeysOf, removeLight, duplicateLight, lightKindLabel,
   setLightColor, setLightGroundColor, setLightAngle, setLightPenumbra,
   setLightWidth, setLightHeight, clearLightTarget, setLightEnvRotation, setLightHdri, setLightColorize,
-  editLightIntensity, editLightPos, editLightPoi, toggleLightKey, setLightGobo,
+  editLightIntensity, editLightPos, editLightPoi, toggleLightKey, setLightGobo, setLightKeysEase,
 } from '../lib/lights';
-import { round } from '../lib/eval';
+import { round, EASE_LIST } from '../lib/eval';
 import { hdriThumbs } from '../lib/hdriThumb';
 import { GOBO_PATTERNS } from '../lib/gobo';
 import { IcTrash } from './icons';
-import type { Channel, Vec3, GoboPattern } from '../types';
+import type { Channel, Vec3, GoboPattern, Light } from '../types';
 
 function KeyDot({ ch, value }: { ch: Channel; value: Vec3 | number }) {
   const l = activeLight(); if (!l) return null;
@@ -48,6 +48,26 @@ function Slider({ label, value, min, max, step, unit, ch, onChange }:
           {unit && <span className="val-fix">{unit}</span>}
         </span>
       </div>
+    </div>
+  );
+}
+
+// Speed-curve presets for the light's position move (same eases as the camera). Shown once the light
+// has an actual move (≥2 position keys). Applies the ease to every segment of the move.
+function LightSpeedCurve({ l }: { l: Light }) {
+  const seg = lightKeysOf(l, 'position').slice(1); // each non-first position key ends a segment (its ease)
+  if (seg.length === 0) return null;
+  const ids = seg.map(k => k.id);
+  const eases = new Set(seg.map(k => k.ease));
+  const common = eases.size === 1 ? seg[0].ease : null;
+  return (
+    <div className="sect" style={{ background: 'var(--panel-2)' }}>
+      <div className="sect-t">Speed curve{common === null && <span className="st"> mixed</span>}</div>
+      <div className="ease-grid">
+        {EASE_LIST.map(ez => <div key={ez} className={'ease-opt' + (common === ez ? ' sel' : '')} onClick={() => setLightKeysEase(ids, ez)}>{ez}</div>)}
+      </div>
+      <EaseCurve ease={common ?? seg[0].ease} />
+      <p className="hint" style={{ marginTop: 6 }}>Applies to the whole light move.</p>
     </div>
   );
 }
@@ -195,6 +215,8 @@ export default function LightInspector() {
           )}
         </div>
       )}
+
+      {positional && <LightSpeedCurve l={l} />}
       </>)}
     </>
   );
