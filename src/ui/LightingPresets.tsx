@@ -112,6 +112,49 @@ function PresetScene({ preset }: { preset: LightPreset }) {
   );
 }
 
+// Dedicated card for a gobo preset: the light SOURCE sits on the left and throws a cone onto the
+// sphere, with the gobo pattern projected on it (sphere lit from the left). Monochrome, to match.
+function GoboCardScene({ pattern }: { pattern: GoboPattern }) {
+  const src = goboSphereThumb(pattern);
+  const sx = 122, sy = 66, r = 30;          // sphere (pushed right to leave room for the lamp)
+  const lx = 40, ly = 58;                    // lamp (left)
+  const dx = sx - lx, dy = sy - ly, len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len, px = -uy, py = ux;
+  const bx = sx - ux * r, by = sy - uy * r;  // sphere face toward the lamp
+  const srcH = 2.5, bh = r * 0.98;
+  const cone = [[lx + px * srcH, ly + py * srcH], [bx + px * bh, by + py * bh], [bx - px * bh, by - py * bh], [lx - px * srcH, ly - py * srcH]]
+    .map(p => p.map(n => n.toFixed(1)).join(',')).join(' ');
+  const grad = `gsph-${pattern}`, clip = `gclip-${pattern}`;
+  return (
+    <svg viewBox="12 8 176 123.2" width="100%" style={{ display: 'block', background: '#17181c', borderRadius: 7 }}
+      role="img" aria-label={`Gobo (${pattern}) projected onto a sphere from a light on the left`}>
+      <defs>
+        <radialGradient id={grad} cx="0.3" cy="0.44" r="0.85">
+          <stop offset="0%" stopColor="#eceef0" /><stop offset="42%" stopColor="#b7bac0" />
+          <stop offset="74%" stopColor="#6d7075" /><stop offset="100%" stopColor="#33353a" />
+        </radialGradient>
+        <clipPath id={clip}><circle cx={sx} cy={sy} r={r} /></clipPath>
+      </defs>
+      <ellipse cx={sx} cy={sy + r + 16} rx={r * 1.5} ry={9} fill="#202127" />
+      <ellipse cx={sx} cy={sy + r + 3} rx={r * 1.2} ry={6} fill="#000" opacity="0.4" />
+      {/* cone of light from the lamp */}
+      <polygon points={cone} fill="#e9ebee" opacity="0.15" />
+      <line x1={lx} y1={ly} x2={bx.toFixed(1)} y2={by.toFixed(1)} stroke="#e9ebee" strokeWidth="1.2" opacity="0.55" />
+      {/* sphere + projected gobo */}
+      <circle cx={sx} cy={sy} r={r} fill={`url(#${grad})`} />
+      {src && <image href={src} x={sx - r} y={sy - r} width={r * 2} height={r * 2} preserveAspectRatio="xMidYMid slice"
+        clipPath={`url(#${clip})`} style={{ mixBlendMode: 'multiply' }} opacity="0.9" />}
+      {/* lamp glyph (left) */}
+      {[0, 45, 90, 135, 180, 225, 270, 315].map(a => {
+        const rad = (a * Math.PI) / 180;
+        return <line key={a} x1={(lx + Math.cos(rad) * 6).toFixed(1)} y1={(ly + Math.sin(rad) * 6).toFixed(1)}
+          x2={(lx + Math.cos(rad) * 9).toFixed(1)} y2={(ly + Math.sin(rad) * 9).toFixed(1)} stroke="#eceef0" strokeWidth="1.1" strokeLinecap="round" />;
+      })}
+      <circle cx={lx} cy={ly} r="4.6" fill="#f2f3f5" />
+    </svg>
+  );
+}
+
 export default function LightingPresets() {
   useRev();
   const [open, setOpen] = useState(true);
@@ -138,7 +181,7 @@ export default function LightingPresets() {
                   border: `${on ? 2 : 1}px solid ${on ? 'var(--blue)' : 'var(--line-2)'}`,
                   borderRadius: 9,
                 }}>
-                <PresetScene preset={preset} />
+                {presetGobo(preset) ? <GoboCardScene pattern={presetGobo(preset)!} /> : <PresetScene preset={preset} />}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 6 }}>
                   <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-1)' }}>{preset.label}</span>
                   {on && (
