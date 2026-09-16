@@ -145,7 +145,7 @@ export default function Timeline() {
     const clipEdge = el.getAttribute('data-clip-start') || el.getAttribute('data-clip-end');
     if (clipEdge) {
       const edge = el.getAttribute('data-clip-start') ? 'start' as const : 'end' as const;
-      if (clipEdge !== proj.activeCameraId) S().selectCamera(clipEdge);
+      if (clipEdge !== proj.activeCameraId || S().ui.inspect !== 'camera') S().selectCamera(clipEdge);
       try { (e.currentTarget as SVGElement).setPointerCapture(e.pointerId); } catch { /* best-effort */ }
       drag.current = { mode: 'clip', camId: clipEdge, edge, pointerId: e.pointerId };
       return;
@@ -164,7 +164,7 @@ export default function Timeline() {
     if (lightId) { selectLight(lightId); return; } // click a light track header → select that light
     const keyId = el.getAttribute('data-key'); const camId = el.getAttribute('data-cam');
     try { (e.currentTarget as SVGElement).setPointerCapture(e.pointerId); } catch { /* capture is best-effort */ }
-    if (camId && camId !== proj.activeCameraId) S().selectCamera(camId);
+    if (camId && (camId !== proj.activeCameraId || S().ui.inspect !== 'camera')) S().selectCamera(camId);
     const { x: px, y: py } = svgPt(e);
     if (keyId) {
       if (e.shiftKey) { S().toggleSelectKey(keyId); drag.current = null; return; } // shift-click toggles, no drag
