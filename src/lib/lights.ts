@@ -107,6 +107,16 @@ export const setLightHdri = (hdri: string | undefined, name?: string) => withLig
   if (l.hdri && l.hdri.startsWith('blob:') && l.hdri !== hdri) URL.revokeObjectURL(l.hdri);
   l.hdri = hdri; l.hdriName = name;
 });
+// Point the scene's ENV light at an image (regardless of the current selection) — used by the AI
+// "Env light from image" flow so reflections pick up the reference. Standard images load as equirect.
+export function setEnvHdriFromImage(url: string, name: string) {
+  const st = S(); const env = st.project.lights.find(l => l.kind === 'env');
+  if (!env) { st.toast('No environment light in the scene'); return; }
+  if (env.hdri && env.hdri.startsWith('blob:') && env.hdri !== url) URL.revokeObjectURL(env.hdri);
+  env.hdri = url; env.hdriName = name; env.colorize = false;
+  delete st.ui.hidden[lightHideKey(env.id)]; // make sure the env isn't hidden
+  st.bump();
+}
 
 // ── animatable properties (position / POI / intensity) ──────────────────────
 export function editLightIntensity(v: number) {

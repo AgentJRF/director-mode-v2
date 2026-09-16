@@ -6,6 +6,7 @@ import { evaluate, eulerFromLookAt, sphericalToPose, clamp } from '../lib/eval';
 import { matchCamera, matchMotion, matchLighting, type LightingMetrics, type LightingEstimate } from '../lib/aiMatch';
 import { fuseAB, applyMotionSpec, stepToPose, arcControls, type MotionSpec, type MotionStep } from '../lib/presets';
 import { applyLightPreset } from '../lib/lightPresets';
+import { setEnvHdriFromImage } from '../lib/lights';
 import type { Ease, Vec3 } from '../types';
 
 function Shell({ title, children, footer }: { title: string; children: React.ReactNode; footer: React.ReactNode }) {
@@ -280,7 +281,7 @@ function AIHubModal() {
           {opt('From video', 'Recreate a camera move from a reference clip as editable keyframes.', () => S().setModal('ai-video'))}
         </>) : (<>
           {opt('Match reference', 'Read a reference image and set up a matching light rig (editable).', () => S().setModal('ai-light-match'))}
-          {opt('Env light from image', 'Build an environment (IBL) from a reference so reflections match the asset.', undefined, true)}
+          {opt('Env light from image', 'Build an environment (IBL) from a reference so reflections match the asset.', () => S().setModal('ai-light-env'))}
         </>)}
       </div>
     </Shell>
@@ -361,6 +362,28 @@ function AILightMatchModal() {
   );
 }
 
+// ✦ AI · Env light from a reference image → sets the scene's environment (IBL) to that image so the
+// asset's reflections + ambient pick up its tones. (Wizard-of-Oz: the image is used directly as the env.)
+function AILightEnvModal() {
+  const [file, setFile] = useState<{ url: string; name: string } | null>(null);
+  const onFile = (f?: File) => { if (!f) return; setFile({ url: URL.createObjectURL(f), name: f.name }); };
+  const apply = () => {
+    if (!file) { S().toast('Upload an image first'); return; }
+    setEnvHdriFromImage(file.url, file.name); S().setModal(null); S().toast('Environment built from image');
+  };
+  return (
+    <Shell title="AI · Env light from image"
+      footer={<><button className="tbtn" onClick={() => S().setModal('ai')}>← Back</button><button className="tbtn primary" onClick={apply}>Build environment</button></>}>
+      <p className="hint" style={{ marginTop: 0 }}>Upload a reference image — it becomes the scene's environment (IBL) so the asset's reflections and ambient pick up its tones. Tune Intensity / Rotation afterwards on the Environment light. Equirectangular (360°) images map best.</p>
+      <label className="ai-drop">
+        {file ? <img src={file.url} alt="reference" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 6 }} />
+          : <span style={{ color: 'var(--ink-2)' }}>⬆ Click to upload an image (JPG / PNG)</span>}
+        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => onFile(e.target.files?.[0])} />
+      </label>
+    </Shell>
+  );
+}
+
 const RATIOS: [string, number, number][] = [['16:9', 1920, 1080], ['9:16', 1080, 1920], ['1:1', 1080, 1080], ['2.39:1', 2048, 858], ['4:5', 1080, 1350]];
 
 function ExportModal() {
@@ -421,6 +444,7 @@ export default function Modals() {
   if (m === 'ai-image') return <AIImageModal />;
   if (m === 'ai-video') return <AIVideoModal />;
   if (m === 'ai-light-match') return <AILightMatchModal />;
+  if (m === 'ai-light-env') return <AILightEnvModal />;
   if (m === 'export') return <ExportModal />;
   return null;
 }

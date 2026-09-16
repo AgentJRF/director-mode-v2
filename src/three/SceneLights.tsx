@@ -177,14 +177,19 @@ function EnvNode({ light }: { light: Light }) {
     texRef.current = null;
     if (!url) { scene.environment = null; return; }
     let cancelled = false;
-    const Loader = ext === 'exr' ? EXRLoader : RGBELoader;
-    new Loader().load(url, tex => {
+    // Standard images (jpg/png/webp — e.g. an AI "Env light from image" reference) load via TextureLoader
+    // as an sRGB equirect; .exr/.hdr use their HDR loaders. Either way it's PMREM'd for the environment.
+    const isHdr = ext === 'exr' || ext === 'hdr' || ext === 'rgbe' || ext === 'pic';
+    const onLoad = (tex: THREE.Texture) => {
       if (cancelled) { tex.dispose(); return; }
-      if (!hdriThumbs.has(url)) { try { makeHdriThumb(gl, tex, url); S().bump(); } catch { /* preview optional */ } }
       tex.mapping = THREE.EquirectangularReflectionMapping;
+      if (!isHdr) tex.colorSpace = THREE.SRGBColorSpace;
+      if (!hdriThumbs.has(url)) { try { makeHdriThumb(gl, tex, url); S().bump(); } catch { /* preview optional */ } }
       texRef.current = tex;
       setLoaded(n => n + 1);
-    });
+    };
+    const loader = isHdr ? new (ext === 'exr' ? EXRLoader : RGBELoader)() : new THREE.TextureLoader();
+    loader.load(url, onLoad);
     return () => { cancelled = true; scene.environment = null; texRef.current?.dispose(); texRef.current = null; };
   }, [gl, scene, url, ext]);
 
