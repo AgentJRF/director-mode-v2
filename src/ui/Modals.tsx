@@ -258,30 +258,43 @@ function AIVideoModal() {
   );
 }
 
+const AI_ICON = {
+  camera: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 8h3l1.5-2h7L17 8h3v11H4z" /><circle cx="12" cy="13" r="3.2" /></svg>,
+  film: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 4v16M16 4v16M4 9h4M4 15h4M16 9h4M16 15h4" /></svg>,
+  rays: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3.4" /><path d="M12 3v2.6M12 18.4V21M3 12h2.6M18.4 12H21M5.6 5.6l1.9 1.9M16.5 16.5l1.9 1.9M18.4 5.6l-1.9 1.9M7.5 16.5l-1.9 1.9" /></svg>,
+  globe: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.5" /><ellipse cx="12" cy="12" rx="3.6" ry="8.5" /><path d="M3.5 12h17" /></svg>,
+};
+
 // ✦ AI hub — one entry that groups the camera + lighting AI flows (tabbed). Each option opens its
 // dedicated modal so the existing flows are reused unchanged.
 function AIHubModal() {
   const [tab, setTab] = useState<'camera' | 'lighting'>('camera');
-  const opt = (title: string, desc: string, onClick?: () => void, soon?: boolean) => (
-    <button className="ref" disabled={soon} onClick={onClick}
-      style={{ textAlign: 'left', padding: 12, cursor: soon ? 'default' : 'pointer', opacity: soon ? 0.55 : 1, display: 'block', width: '100%' }}>
-      <div style={{ fontWeight: 600, marginBottom: 4 }}>{title}{soon && <span className="badge proto" style={{ marginLeft: 6 }}>bientôt</span>}</div>
-      <div className="hint" style={{ margin: 0 }}>{desc}</div>
+  const Card = ({ icon, title, desc, onClick }: { icon: React.ReactNode; title: string; desc: string; onClick: () => void }) => (
+    <button onClick={onClick}
+      style={{ display: 'flex', gap: 11, alignItems: 'flex-start', textAlign: 'left', width: '100%', padding: 13, background: 'var(--panel-2)', border: '1px solid var(--line-2)', borderRadius: 11, cursor: 'pointer', transition: 'border-color .12s, transform .1s, box-shadow .12s' }}
+      onMouseEnter={e => { e.currentTarget.style.borderColor = '#8b5cff'; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = '0 4px 16px rgba(120,90,255,.18)'; }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--line-2)'; e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = 'none'; }}>
+      <span style={{ flex: '0 0 auto', width: 36, height: 36, borderRadius: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg,rgba(139,92,255,.28),rgba(63,138,224,.28))', color: '#c9b6ff' }}>{icon}</span>
+      <span style={{ minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 3 }}>{title}</div>
+        <div className="hint" style={{ margin: 0, fontSize: 11.5, lineHeight: 1.45 }}>{desc}</div>
+      </span>
     </button>
   );
   return (
     <Shell title="✦ AI" footer={<button className="tbtn" onClick={() => S().setModal(null)}>Close</button>}>
-      <div className="seg" style={{ marginBottom: 12 }}>
-        <button className={tab === 'camera' ? 'sel' : ''} onClick={() => setTab('camera')}>Camera</button>
-        <button className={tab === 'lighting' ? 'sel' : ''} onClick={() => setTab('lighting')}>Lighting</button>
+      <p className="hint" style={{ marginTop: 0 }}>Compose from a reference — for the camera, or the lighting.</p>
+      <div className="seg" style={{ marginBottom: 14, display: 'flex' }}>
+        <button className={tab === 'camera' ? 'sel' : ''} onClick={() => setTab('camera')} style={{ flex: 1 }}>Camera</button>
+        <button className={tab === 'lighting' ? 'sel' : ''} onClick={() => setTab('lighting')} style={{ flex: 1 }}>Lighting</button>
       </div>
-      <div className="ref-grid" style={{ gridTemplateColumns: '1fr', gap: 8 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {tab === 'camera' ? (<>
-          {opt('From image', 'Compose a shot from a reference photo — angle, focal length, aperture.', () => S().setModal('ai-image'))}
-          {opt('From video', 'Recreate a camera move from a reference clip as editable keyframes.', () => S().setModal('ai-video'))}
+          <Card icon={AI_ICON.camera} title="From image" desc="Compose a shot from a reference photo — angle, focal, aperture." onClick={() => S().setModal('ai-image')} />
+          <Card icon={AI_ICON.film} title="From video" desc="Recreate a camera move from a clip as editable keyframes." onClick={() => S().setModal('ai-video')} />
         </>) : (<>
-          {opt('Match reference', 'Read a reference image and set up a matching light rig (editable).', () => S().setModal('ai-light-match'))}
-          {opt('Env light from image', 'Build an environment (IBL) from a reference so reflections match the asset.', () => S().setModal('ai-light-env'))}
+          <Card icon={AI_ICON.rays} title="Match reference" desc="Set up a matching light rig from a reference image." onClick={() => S().setModal('ai-light-match')} />
+          <Card icon={AI_ICON.globe} title="Env light from image" desc="Build an environment (IBL) so reflections match the asset." onClick={() => S().setModal('ai-light-env')} />
         </>)}
       </div>
     </Shell>
