@@ -177,7 +177,12 @@ export default function LightingPresets() {
   useRev();
   const [open, setOpen] = useState(true);
   const [sel, setSel] = useState<string | null>(null);
+  const [naming, setNaming] = useState(false);
+  const [name, setName] = useState('');
   const userPresets = loadUserPresets();
+
+  const doSave = () => { saveCurrentAsPreset(name); setNaming(false); setName(''); };
+  const cancelSave = () => { setNaming(false); setName(''); };
 
   const applyCard = (kind: string) => {
     if (kind.startsWith('user:')) applyUserPreset(kind.slice(5));
@@ -212,8 +217,17 @@ export default function LightingPresets() {
           <path d="M2.5 4 5 6.5 7.5 4" /></svg>
         Lighting presets
         <span className="ol-add" title="Save the current lighting as a preset" style={{ marginLeft: 'auto' }}
-          onClick={e => { e.stopPropagation(); const n = window.prompt('Preset name'); if (n !== null) saveCurrentAsPreset(n); }}>+</span>
+          onClick={e => { e.stopPropagation(); setOpen(true); setNaming(true); }}>+</span>
       </div>
+      {open && naming && (
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8, padding: 6, background: 'var(--panel-2)', border: '1px solid var(--line-2)', borderRadius: 8 }}>
+          <input autoFocus value={name} placeholder="Preset name" onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') doSave(); if (e.key === 'Escape') cancelSave(); }}
+            style={{ flex: 1, minWidth: 0, height: 26, padding: '0 8px', fontSize: 12, color: 'var(--ink)', background: 'var(--panel)', border: '1px solid var(--line-2)', borderRadius: 5, outline: 'none' }} />
+          <button className="btn-sm" onClick={doSave} style={{ padding: '3px 10px', fontSize: 11, background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 5 }}>Save</button>
+          <button className="btn-sm" onClick={cancelSave} style={{ padding: '3px 8px', fontSize: 11 }}>Cancel</button>
+        </div>
+      )}
       {open && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
           {LIGHT_PRESETS.map(p => card(p, p.kind))}
