@@ -3,8 +3,9 @@ import { S, PIVOT } from '../store';
 import MatchPreview, { MotionPreview } from '../three/MatchPreview';
 import { useRev } from './bits';
 import { evaluate, eulerFromLookAt, sphericalToPose, clamp } from '../lib/eval';
-import { matchCamera, matchMotion } from '../lib/aiMatch';
+import { matchCamera, matchMotion, matchLighting, type LightingMetrics, type LightingEstimate } from '../lib/aiMatch';
 import { fuseAB, applyMotionSpec, stepToPose, arcControls, type MotionSpec, type MotionStep } from '../lib/presets';
+import { applyLightPreset } from '../lib/lightPresets';
 import type { Ease, Vec3 } from '../types';
 
 function Shell({ title, children, footer }: { title: string; children: React.ReactNode; footer: React.ReactNode }) {
@@ -256,6 +257,110 @@ function AIVideoModal() {
   );
 }
 
+// ✦ AI hub — one entry that groups the camera + lighting AI flows (tabbed). Each option opens its
+// dedicated modal so the existing flows are reused unchanged.
+function AIHubModal() {
+  const [tab, setTab] = useState<'camera' | 'lighting'>('camera');
+  const opt = (title: string, desc: string, onClick?: () => void, soon?: boolean) => (
+    <button className="ref" disabled={soon} onClick={onClick}
+      style={{ textAlign: 'left', padding: 12, cursor: soon ? 'default' : 'pointer', opacity: soon ? 0.55 : 1, display: 'block', width: '100%' }}>
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>{title}{soon && <span className="badge proto" style={{ marginLeft: 6 }}>bientôt</span>}</div>
+      <div className="hint" style={{ margin: 0 }}>{desc}</div>
+    </button>
+  );
+  return (
+    <Shell title="✦ AI" footer={<button className="tbtn" onClick={() => S().setModal(null)}>Close</button>}>
+      <div className="seg" style={{ marginBottom: 12 }}>
+        <button className={tab === 'camera' ? 'sel' : ''} onClick={() => setTab('camera')}>Camera</button>
+        <button className={tab === 'lighting' ? 'sel' : ''} onClick={() => setTab('lighting')}>Lighting</button>
+      </div>
+      <div className="ref-grid" style={{ gridTemplateColumns: '1fr', gap: 8 }}>
+        {tab === 'camera' ? (<>
+          {opt('From image', 'Compose a shot from a reference photo — angle, focal length, aperture.', () => S().setModal('ai-image'))}
+          {opt('From video', 'Recreate a camera move from a reference clip as editable keyframes.', () => S().setModal('ai-video'))}
+        </>) : (<>
+          {opt('Match reference', 'Read a reference image and set up a matching light rig (editable).', () => S().setModal('ai-light-match'))}
+          {opt('Env light from image', 'Build an environment (IBL) from a reference so reflections match the asset.', undefined, true)}
+        </>)}
+      </div>
+    </Shell>
+  );
+}
+
+// ✦ AI · Lighting from a reference image → a matching preset (editable rig). Reads the image's overall
+// tone (luminance / warmth / saturation) client-side and maps it to a lighting preset (Wizard-of-Oz).
+function AILightMatchModal() {
+  const [img, setImg] = useState<{ url: string; data: string; media: string; name: string; metrics: LightingMetrics } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [est, setEst] = useState<LightingEstimate | null>(null);
+
+  const onFile = (f?: File) => {
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      const url = rd.result as string;
+      const data = url.slice(url.indexOf(',') + 1), media = url.slice(5, url.indexOf(';'));
+      const im = new Image();
+      im.onload = () => {
+        const N = 32, c = document.createElement('canvas'); c.width = c.height = N;
+        const x = c.getContext('2d')!; x.drawImage(im, 0, 0, N, N); const d = x.getImageData(0, 0, N, N).data;
+        let rs = 0, bs = 0, lum = 0, sat = 0; const n = N * N;
+        for (let i = 0; i < d.length; i += 4) {
+          const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+          rs += r; bs += b; lum += 0.299 * r + 0.587 * g + 0.114 * b;
+          const mx = Math.max(r, g, b), mn = Math.min(r, g, b); sat += mx > 0 ? (mx - mn) / mx : 0;
+        }
+        setImg({ url, data, media, name: f.name, metrics: { lum: lum / n, warmth: (rs - bs) / n, sat: sat / n } });
+      };
+      im.src = url;
+    };
+    rd.readAsDataURL(f);
+  };
+  const analyze = async () => {
+    if (!img) { S().toast('Upload an image first'); return; }
+    setBusy(true);
+    try { setEst(await matchLighting({ name: img.name, metrics: img.metrics, imageBase64: img.data, mediaType: img.media })); }
+    catch { S().toast('AI request failed'); }
+    setBusy(false);
+  };
+  const apply = () => { if (!est) return; applyLightPreset(est.preset); S().setModal(null); S().toast(`${est.label} lighting applied`); };
+
+  if (est && img) {
+    return (
+      <Shell title="AI review · Lighting from image"
+        footer={<><button className="tbtn" onClick={() => setEst(null)}>← Back</button><button className="tbtn primary" onClick={apply}>Apply lighting</button></>}>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Reference</div>
+            <img src={img.url} alt="reference" style={{ width: '100%', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Matched lighting</div>
+            <div style={{ padding: 12, border: '1px solid var(--line-2)', borderRadius: 6, background: 'var(--panel-2)' }}>
+              <div style={{ fontWeight: 600, fontSize: 16 }}>{est.label}</div>
+              <div className="row" style={{ marginTop: 8 }}><label>Confidence</label><ConfBar c={est.confidence} /></div>
+              {est.mocked && <span className="badge proto">estimated (heuristic)</span>}
+            </div>
+          </div>
+        </div>
+        <p className="hint" style={{ marginTop: 8 }}>{est.reasoning}</p>
+        <p className="hint">Applies the matched preset as editable lights — replaces the working lights, keeps the cameras + environment.</p>
+      </Shell>
+    );
+  }
+  return (
+    <Shell title="AI · Lighting from image"
+      footer={<><button className="tbtn" onClick={() => S().setModal('ai')}>← Back</button><button className="tbtn primary" onClick={analyze}>{busy ? 'Analyzing…' : 'Analyze'}</button></>}>
+      <p className="hint" style={{ marginTop: 0 }}>Upload a reference photo — the AI reads its overall lighting (tone, warmth, contrast) and sets up a matching light rig you can tweak.</p>
+      <label className="ai-drop">
+        {img ? <img src={img.url} alt="reference" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 6 }} />
+          : <span style={{ color: 'var(--ink-2)' }}>⬆ Click to upload an image (JPG / PNG)</span>}
+        <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => onFile(e.target.files?.[0])} />
+      </label>
+    </Shell>
+  );
+}
+
 const RATIOS: [string, number, number][] = [['16:9', 1920, 1080], ['9:16', 1080, 1920], ['1:1', 1080, 1080], ['2.39:1', 2048, 858], ['4:5', 1080, 1350]];
 
 function ExportModal() {
@@ -312,8 +417,10 @@ export default function Modals() {
   useRev();
   const m = S().ui.modal;
   if (m === 'interp') return <InterpModal />;
+  if (m === 'ai') return <AIHubModal />;
   if (m === 'ai-image') return <AIImageModal />;
   if (m === 'ai-video') return <AIVideoModal />;
+  if (m === 'ai-light-match') return <AILightMatchModal />;
   if (m === 'export') return <ExportModal />;
   return null;
 }

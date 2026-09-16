@@ -16,8 +16,7 @@ export default function Topbar() {
       <button className="tbtn" title="Redo (Ctrl+Y / Ctrl+Shift+Z)" disabled={!canRedo} onClick={() => S().redo()}
         style={{ padding: '5px 9px', display: 'inline-flex', alignItems: 'center', color: canRedo ? 'var(--ink)' : 'var(--ink-3)', opacity: canRedo ? 1 : 0.55 }}><IcRedo size={18} /></button>
       <div className="top-spacer" />
-      <button className="tbtn" title="AI — match camera from an image" onClick={() => S().setModal('ai-image')}>✦ AI image</button>
-      <button className="tbtn" title="AI — animation from a video" onClick={() => S().setModal('ai-video')}>✦ AI video</button>
+      <button className="tbtn" title="AI — camera + lighting from a reference" onClick={() => S().setModal('ai')}>✦ AI</button>
       <button className="tbtn" onClick={() => S().setModal('export')}>Export</button>
     </div>
   );

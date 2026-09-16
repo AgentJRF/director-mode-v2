@@ -2,6 +2,7 @@
 // works on a static host (Vercel). Order for each: baked pose (by file-name substring) → dev-server
 // endpoint (real Claude vision in `npm run dev`; absent on a static build) → local heuristic.
 import type { Vec3, Ease } from '../types';
+import type { LightPresetKind } from './lightPresets';
 
 // ---- image (camera pose) --------------------------------------------------
 export type ExactPose = { position: Vec3; rotation: Vec3; focal: number; aperture: number; focusPoint: Vec3 | null };
@@ -92,6 +93,39 @@ export async function matchMotion(name: string): Promise<MotionEstimateT> {
   if (demo) return demo[1];
   const dev = await tryJson('/api/match-motion', { name });
   return (dev as MotionEstimateT) ?? motionHeuristic();
+}
+
+// ---- lighting (match a reference image → a light rig / preset) -------------
+export type LightingMetrics = { lum: number; warmth: number; sat: number }; // 0..1 luminance, -1..1 warm-cool, 0..1 saturation
+export type LightingEstimate = { preset: LightPresetKind; label: string; confidence: number; reasoning: string; mocked?: boolean };
+
+const LIGHTING_DEMO: [string, LightingEstimate][] = [
+  ['sunset', { preset: 'golden-hour', label: 'Golden hour', confidence: 0.9, reasoning: 'Warm, low-angle key with a golden ambient — classic sunset cast.' }],
+  ['golden', { preset: 'golden-hour', label: 'Golden hour', confidence: 0.9, reasoning: 'Warm directional key + warm ambient.' }],
+  ['neon', { preset: 'neon', label: 'Neon', confidence: 0.88, reasoning: 'Saturated coloured key/rim over a dark ambient — night/neon look.' }],
+  ['studio', { preset: 'softbox', label: 'Softbox', confidence: 0.86, reasoning: 'Bright, even, soft light — clean studio packshot.' }],
+  ['dramatic', { preset: 'dramatic', label: 'Dramatic', confidence: 0.85, reasoning: 'Single hard key, deep shadows — chiaroscuro.' }],
+];
+const LABEL: Record<LightPresetKind, string> = {
+  'three-point': 'Three-point', gobo: 'Gobo', 'golden-hour': 'Golden hour', softbox: 'Softbox', dramatic: 'Dramatic', neon: 'Neon',
+};
+// Heuristic: map the reference's overall tone to a lighting preset (real-ish signal from the image).
+function lightingHeuristic(m: LightingMetrics): LightingEstimate {
+  let preset: LightPresetKind; let why: string;
+  if (m.sat > 0.5 && m.lum < 0.6) { preset = 'neon'; why = 'Saturated colours over darker midtones → coloured key/rim (neon).'; }
+  else if (m.lum < 0.32) { preset = 'dramatic'; why = 'Low-key, high-contrast reference → single hard key with deep shadows.'; }
+  else if (m.warmth > 0.14) { preset = 'golden-hour'; why = 'Warm cast → low warm key + warm ambient (golden hour).'; }
+  else if (m.lum > 0.62 && m.sat < 0.35) { preset = 'softbox'; why = 'Bright, even, low-saturation reference → soft studio boxes.'; }
+  else { preset = 'three-point'; why = 'Balanced reference → a neutral three-point rig.'; }
+  return { preset, label: LABEL[preset], confidence: 0.55, reasoning: why + ' Estimated from the image tone — tweak the lights after.', mocked: true };
+}
+
+export async function matchLighting(p: { name?: string; metrics: LightingMetrics; imageBase64?: string; mediaType?: string }): Promise<LightingEstimate> {
+  const name = (p.name || '').toLowerCase();
+  const demo = LIGHTING_DEMO.find(([k]) => name.includes(k));
+  if (demo) return demo[1];
+  const dev = await tryJson('/api/match-lighting', p);
+  return (dev as LightingEstimate) ?? lightingHeuristic(p.metrics);
 }
 
 // Try the dev-server endpoint; returns null on a static host (no endpoint → HTML/404/network error).
