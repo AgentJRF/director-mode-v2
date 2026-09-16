@@ -11,10 +11,11 @@ export type CameraEstimate = {
   aperture_f: number; confidence: number; reasoning: string; mocked?: boolean; pose?: ExactPose;
 };
 
-const GILL_DUFFEL: CameraEstimate = {
-  azimuth_deg: -62, elevation_deg: 10, distance_factor: 3.37, focal_mm: 40, aperture_f: 8, confidence: 0.9,
-  reasoning: 'Cylindrical holdall in 3/4 from a near eye-level angle: circular end large to camera-left, body receding right. Wide ~40mm framing, deep focus (even product lighting, minimal bokeh).',
+const LOWEPRO_BACKPACK: CameraEstimate = {
+  azimuth_deg: -163, elevation_deg: 7, distance_factor: 2.4, focal_mm: 50, aperture_f: 8, confidence: 0.9,
+  reasoning: 'Rear 3/4 of the backpack at near eye-level: harness and back panel to camera, body turned away. Standard ~50mm framing, deep focus (even product lighting, minimal bokeh).',
   mocked: false,
+  pose: { position: [-1.86, 2.09, -6.06], rotation: [-6.7, -163.1, 0], focal: 50, aperture: 8, focusPoint: [-0.01, 1.33, 0.07] },
 };
 const ORANGE_DETAIL: CameraEstimate = {
   azimuth_deg: -7, elevation_deg: 64, distance_factor: 1.1, focal_mm: 37, aperture_f: 1.4, confidence: 0.85,
@@ -31,7 +32,8 @@ const ORANGE_ZIP_FRONT: CameraEstimate = {
 // order matters: `find` returns the FIRST match → specific keys before generic ones.
 const CAMERA_DEMO: [string, CameraEstimate][] = [
   ['lining', ORANGE_ZIP_FRONT],
-  ['gill', GILL_DUFFEL], ['duffel', GILL_DUFFEL], ['holdall', GILL_DUFFEL],
+  ['backpack', LOWEPRO_BACKPACK], ['lowepro', LOWEPRO_BACKPACK], ['protactic', LOWEPRO_BACKPACK],
+  ['gill', LOWEPRO_BACKPACK], ['duffel', LOWEPRO_BACKPACK], ['holdall', LOWEPRO_BACKPACK],
   ['orange', ORANGE_DETAIL], ['zip', ORANGE_DETAIL], ['detail', ORANGE_DETAIL], ['macro', ORANGE_DETAIL],
 ];
 function imageHeuristic(w?: number, h?: number): CameraEstimate {
