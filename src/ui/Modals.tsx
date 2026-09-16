@@ -9,6 +9,15 @@ import { applyLightPreset, applyRig } from '../lib/lightPresets';
 import { setEnvHdriFromImage } from '../lib/lights';
 import type { Ease, Vec3 } from '../types';
 
+// Grab the current WebGL viewport as a data-URL (the Canvas runs with preserveDrawingBuffer:true).
+// Waits a beat so a just-applied state change has painted under the demand frameloop.
+const captureViewport = (): Promise<string | null> => new Promise(res => {
+  setTimeout(() => requestAnimationFrame(() => {
+    const c = document.querySelector('#canvas-wrap canvas') as HTMLCanvasElement | null;
+    res(c ? c.toDataURL('image/jpeg', 0.85) : null);
+  }), 180);
+});
+
 function Shell({ title, children, footer }: { title: string; children: React.ReactNode; footer: React.ReactNode }) {
   return (
     <div className="scrim" onClick={e => { if (e.target === e.currentTarget) S().setModal(null); }}>
@@ -307,6 +316,7 @@ function AILightMatchModal() {
   const [img, setImg] = useState<{ url: string; data: string; media: string; name: string; metrics: LightingMetrics } | null>(null);
   const [busy, setBusy] = useState(false);
   const [est, setEst] = useState<LightingEstimate | null>(null);
+  const [shot, setShot] = useState<string | null>(null); // viewport capture WITH the matched rig applied (for the side-by-side)
 
   const onFile = (f?: File) => {
     if (!f) return;
@@ -333,32 +343,44 @@ function AILightMatchModal() {
   const analyze = async () => {
     if (!img) { S().toast('Upload an image first'); return; }
     setBusy(true);
-    try { setEst(await matchLighting({ name: img.name, metrics: img.metrics, imageBase64: img.data, mediaType: img.media })); }
-    catch { S().toast('AI request failed'); }
+    try {
+      const e = await matchLighting({ name: img.name, metrics: img.metrics, imageBase64: img.data, mediaType: img.media });
+      // Apply the matched rig to the live scene so the viewport shows the result, then capture it for
+      // the side-by-side. "← Back" undoes this; keeping the modal open leaves it applied.
+      if (e.rig) applyRig(e.rig); else applyLightPreset(e.preset);
+      setShot(await captureViewport());
+      setEst(e);
+    } catch { S().toast('AI request failed'); }
     setBusy(false);
   };
-  const apply = () => { if (!est) return; if (est.rig) applyRig(est.rig); else applyLightPreset(est.preset); S().setModal(null); S().toast(`${est.label} lighting applied`); };
+  const keep = () => { if (!est) return; S().setModal(null); S().toast(`${est.label} lighting applied`); };
+  const back = () => { S().undo(); setEst(null); setShot(null); }; // revert the applied rig, return to upload
 
   if (est && img) {
     return (
       <Shell title="AI review · Lighting from image"
-        footer={<><button className="tbtn" onClick={() => setEst(null)}>← Back</button><button className="tbtn primary" onClick={apply}>Apply lighting</button></>}>
+        footer={<><button className="tbtn" onClick={back}>← Back</button><button className="tbtn primary" onClick={keep}>Keep lighting</button></>}>
         <div style={{ display: 'flex', gap: 10 }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Reference</div>
-            <img src={img.url} alt="reference" style={{ width: '100%', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
+            <img src={img.url} alt="reference" style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Matched lighting</div>
-            <div style={{ padding: 12, border: '1px solid var(--line-2)', borderRadius: 6, background: 'var(--panel-2)' }}>
-              <div style={{ fontWeight: 600, fontSize: 16 }}>{est.label}</div>
-              <div className="row" style={{ marginTop: 8 }}><label>Confidence</label><ConfBar c={est.confidence} /></div>
-              {est.mocked && <span className="badge proto">estimated (heuristic)</span>}
-            </div>
+            <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Result · viewport</div>
+            {shot
+              ? <img src={shot} alt="viewport result" style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
+              : <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 6, border: '1px solid var(--line-2)', background: 'var(--panel-2)', display: 'grid', placeItems: 'center', color: 'var(--ink-2)', fontSize: 12 }}>Rendering…</div>}
           </div>
         </div>
+        <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--line-2)', borderRadius: 6, background: 'var(--panel-2)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div style={{ fontWeight: 600, fontSize: 15 }}>{est.label}</div>
+            {est.mocked && <span className="badge proto">estimated (heuristic)</span>}
+          </div>
+          <div className="row" style={{ marginTop: 8 }}><label>Match</label><ConfBar c={est.confidence} /></div>
+        </div>
         <p className="hint" style={{ marginTop: 8 }}>{est.reasoning}</p>
-        <p className="hint">Applies the matched preset as editable lights — replaces the working lights, keeps the cameras + environment.</p>
+        <p className="hint">Applied as editable lights — replaced the working lights, kept the cameras + environment. "← Back" reverts.</p>
       </Shell>
     );
   }
