@@ -1,5 +1,5 @@
 import { S } from '../store';
-import { useRev } from './bits';
+import { useRev, NumInput } from './bits';
 import { evalLight, lightPoi } from '../lib/lightEval';
 import {
   activeLight, lightKeysOf, removeLight, duplicateLight, lightKindLabel,
@@ -43,7 +43,10 @@ function Slider({ label, value, min, max, step, unit, ch, onChange }:
       <span className="row-lead">{ch ? <KeyDot ch={ch} value={value} /> : <span className="kf-spacer" />}<label>{label}</label></span>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
         <input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(parseFloat(e.target.value))} />
-        <span className="val-box"><span className="val">{round(value, step < 1 ? 1 : 0)}{unit || ''}</span></span>
+        <span className="val-box">
+          <NumInput value={value} min={min} max={max} step={step} dec={step < 1 ? 1 : 0} onChange={onChange} />
+          {unit && <span className="val-fix">{unit}</span>}
+        </span>
       </div>
     </div>
   );

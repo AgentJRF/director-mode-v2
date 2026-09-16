@@ -78,9 +78,10 @@ export const LIGHT_PRESETS: LightPreset[] = [
     // Two big soft boxes + gentle rim, brighter neutral ambient — clean e-commerce packshot.
     kind: 'softbox', label: 'Softbox', selectRole: 'key', envIntensity: 0.6,
     lights: [
-      { role: 'key', kind: 'area', az: 32, el: 28, distMul: 1.25, intensity: 5, castShadow: true, sizeMul: 1.3 },
-      { role: 'fill', kind: 'area', az: -36, el: 20, distMul: 1.3, intensity: 4, castShadow: false, sizeMul: 1.3 },
-      { role: 'rim', kind: 'spot', az: 165, el: 40, distMul: 1.1, intensity: 4, castShadow: false, angle: 0.8, penumbra: 1 },
+      // Tuned on-asset: smaller boxes than a huge wrap → a touch more shaping. (sizeMul relative to R≈6.)
+      { role: 'key', kind: 'area', az: 32, el: 28, distMul: 1.25, intensity: 5, castShadow: true, sizeMul: 0.42 },
+      { role: 'fill', kind: 'area', az: -36, el: 20, distMul: 1.3, intensity: 4, castShadow: false, sizeMul: 0.5 },
+      { role: 'rim', kind: 'spot', az: 165, el: 40, distMul: 1.1, intensity: 4, castShadow: false, angle: 0.785, penumbra: 1 },
     ],
   },
   {

@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
 import { S, DEFAULT_APERTURE } from '../store';
-import { useRev } from './bits';
+import { useRev, makeScrub, NumInput } from './bits';
 import Outliner from './Outliner';
 import LightInspector from './LightInspector';
 import LightingPresets from './LightingPresets';
 import { activeLight } from '../lib/lights';
-import { evaluate, keysOf, EASE_LIST, EASES, round, poiPoint, clamp } from '../lib/eval';
+import { evaluate, keysOf, EASE_LIST, EASES, round, poiPoint } from '../lib/eval';
 import { applyPreset } from '../lib/presets';
 import { IcTarget, IcEyedropper } from './icons';
 
@@ -24,32 +23,6 @@ function KeyDot({ ch, value, disabled }: { ch: Channel; value: Vec3 | number; di
     onClick={e => { e.stopPropagation(); st.toggleKeyAt(ch, value); }}>{at || ks.length ? '◆' : '◇'}</button>;
 }
 
-// Photoshop/AE-style "scrubby" number field: drag left/right on the box to decrement/increment.
-// A plain click (no drag) falls through to focusing the input for keyboard entry. Shift = fine (×0.25).
-function makeScrub(base: number, step: number, dec: number, onChange: (v: number) => void, min?: number, max?: number) {
-  return (e: ReactPointerEvent<HTMLInputElement>) => {
-    const input = e.currentTarget;
-    if (document.activeElement === input) return; // already editing → let the click place the caret
-    e.preventDefault();                            // suppress focus so a drag scrubs instead of typing
-    const startX = e.clientX; let moved = false;
-    const onMove = (ev: PointerEvent) => {
-      const dx = ev.clientX - startX;
-      if (!moved && Math.abs(dx) < 3) return;      // small movement = still a click
-      moved = true;
-      let v = base + dx * step * (ev.shiftKey ? 0.25 : 1);
-      if (min !== undefined) v = Math.max(min, v);
-      if (max !== undefined) v = Math.min(max, v);
-      onChange(round(v, dec));
-    };
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp);
-      window.removeEventListener('pointercancel', onUp); window.removeEventListener('blur', onUp);
-      if (!moved) { input.focus(); input.select(); } // treat as a click → edit by keyboard
-    };
-    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', onUp);
-    window.addEventListener('pointercancel', onUp); window.addEventListener('blur', onUp);
-  };
-}
 
 function Vec3Row({ label, value, step = 0.1, disabled, ch, onChange }:
   { label: string; value: number[]; step?: number; disabled?: boolean; ch: Channel; onChange: (i: number, v: number) => void }) {
@@ -65,21 +38,6 @@ function Vec3Row({ label, value, step = 0.1, disabled, ch, onChange }:
   );
 }
 
-
-// Hand-editable numeric box: shows the (rounded) value; while focused it holds free text and commits
-// a clamped value on blur / Enter, so typing isn't fought by the min/max clamp mid-keystroke.
-function NumInput({ value, min, max, step, dec, onChange }:
-  { value: number; min: number; max: number; step: number; dec: number; onChange: (v: number) => void }) {
-  const [txt, setTxt] = useState<string | null>(null);
-  const shown = txt ?? String(round(value, dec));
-  const commit = () => { if (txt !== null) { const v = parseFloat(txt); if (!isNaN(v)) onChange(clamp(v, min, max)); setTxt(null); } };
-  return (
-    <input className="val-input" type="number" min={min} max={max} step={step} value={shown}
-      onPointerDown={makeScrub(round(value, dec), step, dec, onChange, min, max)}
-      onChange={e => setTxt(e.target.value)} onBlur={commit}
-      onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setTxt(null); }} />
-  );
-}
 
 function Slider({ label, value, min, max, step, unit, prefix, onChange, disabled, ch }:
   { label: string; value: number; min: number; max: number; step: number; unit?: string; prefix?: string; onChange: (v: number) => void; disabled?: boolean; ch?: Channel }) {
