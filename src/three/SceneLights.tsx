@@ -70,18 +70,12 @@ function LightNode({ light }: { light: Light }) {
     if (l.kind === 'directional') o.castShadow = !!l.castShadow;
     if (l.kind === 'area') {
       const s = o as THREE.RectAreaLight;
-      const w = l.width ?? 4, h = l.height ?? 2;
-      s.width = w; s.height = h;
+      s.width = l.width ?? 4; s.height = l.height ?? 2;
       const aim = lightPoi(l, t);
       o.lookAt(aim[0], aim[1], aim[2]); // RectAreaLight aims via its own orientation (no .target)
       // Drive the shadow-only proxy: sit at the light, aim at the POI, cast when the light casts.
-      // A RectAreaLight can't cast, so size (softbox area) must drive the PROXY's shadow softness —
-      // a bigger emitter → softer/penumbra-wider shadows, matching what resizing a softbox should do.
       const sp = shadowRef.current;
-      if (sp) {
-        sp.position.set(pose.position[0], pose.position[1], pose.position[2]); sp.target = target; sp.castShadow = !!l.castShadow;
-        sp.shadow.radius = Math.max(3, Math.min(10, 2 + (w + h) * 0.6)); // VSM blur ∝ emitter size (kept modest — high radius leaks/bands)
-      }
+      if (sp) { sp.position.set(pose.position[0], pose.position[1], pose.position[2]); sp.target = target; sp.castShadow = !!l.castShadow; }
     }
     if (l.kind === 'spot') {
       const s = o as THREE.SpotLight;
