@@ -216,8 +216,9 @@ export default function LightingPresets() {
           strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6, transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .12s' }}>
           <path d="M2.5 4 5 6.5 7.5 4" /></svg>
         Lighting presets
-        <span className="ol-add" title="Save the current lighting as a preset" style={{ marginLeft: 'auto' }}
-          onClick={e => { e.stopPropagation(); setOpen(true); setNaming(true); }}>+</span>
+        <button className="btn-sm" title="Save the current lighting as a preset"
+          style={{ marginLeft: 'auto', padding: '2px 10px', fontSize: 11, fontWeight: 500 }}
+          onClick={e => { e.stopPropagation(); setOpen(true); setNaming(true); }}>Save preset</button>
       </div>
       {open && naming && (
         <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8, padding: 6, background: 'var(--panel-2)', border: '1px solid var(--line-2)', borderRadius: 8 }}>
