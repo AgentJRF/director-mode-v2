@@ -5,6 +5,6 @@ to "generate" an environment from a reference photo (matched by file-name — se
 `ENV_DEMO` in `src/ui/Modals.tsx`).
 
 Expected file:
-- `mountain-sunset.jpg` — golden-hour mountain pano, used for backpack / mountain / sunset references.
+- `mountain-sunset.png` — golden-hour mountain pano, used for backpack / mountain / sunset references.
 
 LDR `.jpg`/`.png`/`.webp` load as sRGB equirect; `.exr`/`.hdr` load as HDR.

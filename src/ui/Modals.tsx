@@ -20,10 +20,11 @@ const captureViewport = (): Promise<string | null> => new Promise(res => {
 
 // Wizard-of-Oz env "generation": a reference photo whose file-name matches → a real baked 360° pano
 // (in public/env) instead of stretching the flat photo across the sphere. Keyed like the other AI demos.
+const ENV_PANO = '/env/mountain-sunset.png';
 const ENV_DEMO: [string, string][] = [
-  ['backpack', '/env/mountain-sunset.jpg'], ['lowepro', '/env/mountain-sunset.jpg'], ['protactic', '/env/mountain-sunset.jpg'],
-  ['mountain', '/env/mountain-sunset.jpg'], ['sunset', '/env/mountain-sunset.jpg'], ['golden', '/env/mountain-sunset.jpg'],
-  ['outdoor', '/env/mountain-sunset.jpg'], ['hike', '/env/mountain-sunset.jpg'],
+  ['backpack', ENV_PANO], ['lowepro', ENV_PANO], ['protactic', ENV_PANO],
+  ['mountain', ENV_PANO], ['sunset', ENV_PANO], ['golden', ENV_PANO],
+  ['outdoor', ENV_PANO], ['hike', ENV_PANO],
 ];
 const bakedEnv = (name: string): string | null => { const n = name.toLowerCase(); return ENV_DEMO.find(([k]) => n.includes(k))?.[1] ?? null; };
 
@@ -423,7 +424,7 @@ function AILightEnvModal() {
   const baked = file && !file.wide ? bakedEnv(file.name) : null; // matched product ref → a real 360° pano (wizard-of-oz)
   const apply = () => {
     if (!file) { S().toast('Upload an image first'); return; }
-    if (baked) { setEnvHdriFromImage(baked, 'mountain-sunset.jpg'); S().setModal(null); S().toast('Environment generated from reference'); }
+    if (baked) { setEnvHdriFromImage(baked, 'mountain-sunset.png'); S().setModal(null); S().toast('Environment generated from reference'); }
     else { setEnvHdriFromImage(file.url, file.name); S().setModal(null); S().toast('Environment built from image'); }
   };
   return (
