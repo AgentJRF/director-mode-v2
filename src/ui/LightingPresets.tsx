@@ -1,9 +1,14 @@
 import { useState } from 'react';
 import { useRev } from './bits';
 import { LIGHT_PRESETS, applyLightPreset } from '../lib/lightPresets';
-import type { LightPreset, PresetLightSpec, LightRole, LightPresetKind } from '../lib/lightPresets';
+import type { PresetLightSpec, LightRole, LightPresetKind } from '../lib/lightPresets';
+import { loadUserPresets, saveCurrentAsPreset, deleteUserPreset, applyUserPreset, userPresetSpecs } from '../lib/userPresets';
 import { goboSphereThumb } from '../lib/gobo';
+import { IcTrash } from './icons';
 import type { GoboPattern } from '../types';
+
+// Minimal shape the schematic cards need — both built-in presets and user-derived presets satisfy it.
+type CardPreset = { kind: string; label: string; lights: PresetLightSpec[] };
 
 // Monochrome schematic: key = bright, fill = mid, rim = light gray. No hues — the card reads as a
 // single-tone lighting swatch (same look for three-point and gobo).
@@ -22,14 +27,14 @@ function project(d: [number, number, number]) {
 }
 
 // The gobo pattern a preset carries (if any) — projected on the sphere within the schematic.
-function presetGobo(preset: LightPreset): GoboPattern | undefined {
+function presetGobo(preset: CardPreset): GoboPattern | undefined {
   return preset.lights.find(l => l.gobo)?.gobo?.pattern as GoboPattern | undefined;
 }
 
 // A ¾-view scene: a neutral GRAY sphere "asset" on the ground, with a cone of light (flux) flowing from
 // each lamp onto the sphere, the key highlight + a rim edge — all MONOCHROME. When the preset carries a
 // gobo, its pattern is projected onto the sphere so the gobo card keeps this same schematic look.
-function PresetScene({ preset }: { preset: LightPreset }) {
+function PresetScene({ preset }: { preset: CardPreset }) {
   const key = preset.lights.find(l => l.role === 'key');
   const kd = key ? dirOf(key) : [0.5, 0.5, 0.6];
   const hx = 0.5 + kd[0] * 0.3, hy = 0.5 - kd[1] * 0.3;   // gray highlight toward the key
@@ -171,7 +176,33 @@ function GoboCardScene({ pattern }: { pattern: GoboPattern }) {
 export default function LightingPresets() {
   useRev();
   const [open, setOpen] = useState(true);
-  const [sel, setSel] = useState<LightPresetKind | null>(null);
+  const [sel, setSel] = useState<string | null>(null);
+  const userPresets = loadUserPresets();
+
+  const applyCard = (kind: string) => {
+    if (kind.startsWith('user:')) applyUserPreset(kind.slice(5));
+    else applyLightPreset(kind as LightPresetKind);
+  };
+
+  const card = (cp: CardPreset, kind: string, userId?: string) => {
+    const on = sel === kind;
+    return (
+      <div key={kind} className="lp-card" onClick={() => setSel(kind)} title={cp.label}
+        style={{ padding: 6, cursor: 'pointer', background: 'var(--panel-2)', border: `${on ? 2 : 1}px solid ${on ? 'var(--blue)' : 'var(--line-2)'}`, borderRadius: 9 }}>
+        {presetGobo(cp) ? <GoboCardScene pattern={presetGobo(cp)!} /> : <PresetScene preset={cp} />}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 6 }}>
+          <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cp.label}</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '0 0 auto' }}>
+            {userId && <button title="Delete preset" style={{ border: 'none', background: 'none', padding: 2, cursor: 'pointer', color: 'var(--ink-3)', display: 'inline-flex' }}
+              onClick={e => { e.stopPropagation(); if (sel === kind) setSel(null); deleteUserPreset(userId); }}><IcTrash size={12} /></button>}
+            {on && <button className="btn-sm" style={{ padding: '2px 10px', fontSize: 11, background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 5 }}
+              onClick={e => { e.stopPropagation(); applyCard(kind); }}>Apply</button>}
+          </span>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="sect">
       <div className="sect-t" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', cursor: 'pointer', userSelect: 'none' }}
@@ -180,32 +211,13 @@ export default function LightingPresets() {
           strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 6, transform: open ? 'none' : 'rotate(-90deg)', transition: 'transform .12s' }}>
           <path d="M2.5 4 5 6.5 7.5 4" /></svg>
         Lighting presets
+        <span className="ol-add" title="Save the current lighting as a preset" style={{ marginLeft: 'auto' }}
+          onClick={e => { e.stopPropagation(); const n = window.prompt('Preset name'); if (n !== null) saveCurrentAsPreset(n); }}>+</span>
       </div>
       {open && (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 6 }}>
-          {LIGHT_PRESETS.map(preset => {
-            const on = sel === preset.kind;
-            return (
-              <div key={preset.kind} className="lp-card"
-                onClick={() => setSel(preset.kind)}
-                title={preset.label}
-                style={{
-                  padding: 6, cursor: 'pointer', background: 'var(--panel-2)',
-                  border: `${on ? 2 : 1}px solid ${on ? 'var(--blue)' : 'var(--line-2)'}`,
-                  borderRadius: 9,
-                }}>
-                {presetGobo(preset) ? <GoboCardScene pattern={presetGobo(preset)!} /> : <PresetScene preset={preset} />}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 6, gap: 6 }}>
-                  <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--ink-1)' }}>{preset.label}</span>
-                  {on && (
-                    <button className="btn-sm"
-                      style={{ padding: '2px 10px', fontSize: 11, background: 'var(--blue)', color: '#fff', border: 'none', borderRadius: 5 }}
-                      onClick={e => { e.stopPropagation(); applyLightPreset(preset.kind); }}>Apply</button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+          {LIGHT_PRESETS.map(p => card(p, p.kind))}
+          {userPresets.map(up => card({ kind: 'user:' + up.id, label: up.name, lights: userPresetSpecs(up) }, 'user:' + up.id, up.id))}
         </div>
       )}
     </div>
