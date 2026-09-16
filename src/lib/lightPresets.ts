@@ -96,7 +96,7 @@ export const LIGHT_PRESETS: LightPreset[] = [
     // Teal key + magenta rim over a dark cool ambient — stylised neon night look (shows off colour).
     kind: 'neon', label: 'Neon', selectRole: 'key', envIntensity: 0.14, envColor: '#8c93e8',
     lights: [
-      { role: 'key', kind: 'spot', az: 34, el: 26, distMul: 1.2, intensity: 19.3, color: '#00e5e5', castShadow: true, angle: 0.384, penumbra: 0.6 },
+      { role: 'key', kind: 'spot', az: -112, el: 18.5, distMul: 0.78, intensity: 19.3, color: '#00e5e5', castShadow: true, angle: 0.384, penumbra: 0.6 },
       { role: 'rim', kind: 'spot', az: 158, el: 34, distMul: 1.1, intensity: 13, color: '#ff1fd0', castShadow: false, angle: 0.698, penumbra: 0.8 },
     ],
   },
