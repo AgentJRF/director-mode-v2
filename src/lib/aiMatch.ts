@@ -52,6 +52,56 @@ export async function matchCamera(p: { name?: string; width?: number; height?: n
   return (dev as CameraEstimate) ?? imageHeuristic(p.width, p.height);
 }
 
+// ---- camera from a text prompt (offline, no LLM — the proto ships as a static share) ----------------
+// Keyword-driven framing: angle + side, height, distance, focal and depth-of-field parsed from the text.
+export type CameraPrompt = { azimuth: number; elevation: number; distance: number; focal: number; aperture: number; confidence: number; reasoning: string };
+export function cameraFromPrompt(text: string): CameraPrompt {
+  const t = (text || '').toLowerCase();
+  const has = (...w: string[]) => w.some(x => t.includes(x));
+  const cues: string[] = [];
+
+  // Angle around the product (+ side). Magnitude from the shot type, sign from left/right.
+  let mag = 35, note = 'three-quarter';               // default 3/4
+  if (has('profile', 'side on', 'side-on', 'from the side')) { mag = 90; note = 'profile'; }
+  else if (has('front', 'straight on', 'straight-on', 'face on', 'head on', 'head-on')) { mag = 0; note = 'front'; }
+  else if (has('back', 'rear', 'behind', 'from behind')) { mag = 180; note = 'rear'; }
+  else if (has('three-quarter', '3/4', '3-quarter', 'quarter')) { mag = 35; note = 'three-quarter'; }
+  const sign = has('left') ? -1 : 1;
+  const azimuth = mag === 0 || mag === 180 ? mag : mag * sign;
+  cues.push(`${note}${mag !== 0 && mag !== 180 ? (sign < 0 ? ' (left)' : ' (right)') : ''}`);
+
+  // Height.
+  let elevation = 12;
+  if (has('low angle', 'low-angle', 'from below', 'worm', 'hero angle')) { elevation = -8; cues.push('low angle'); }
+  else if (has('top-down', 'top down', 'overhead', 'birds', "bird's", 'flat lay', 'flat-lay', 'from above', 'high angle')) { elevation = 60; cues.push('high / top-down'); }
+  else if (has('eye level', 'eye-level')) { elevation = 8; cues.push('eye level'); }
+
+  // Distance / framing.
+  let distance = 2.6;
+  if (has('close-up', 'closeup', 'close up', 'macro', 'detail', 'tight', 'extreme close')) { distance = 1.6; cues.push('close'); }
+  else if (has('wide', 'establishing', 'far', 'full shot', 'full-body', 'pull back', 'pulled back')) { distance = 4.5; cues.push('wide'); }
+  else if (has('medium')) { distance = 2.8; cues.push('medium'); }
+
+  // Focal length.
+  let focal = 50;
+  if (has('macro')) focal = 100;
+  else if (has('telephoto', 'tele ', 'long lens', '135')) focal = 135;
+  else if (has('portrait', '85')) focal = 85;
+  else if (has('wide-angle', 'wide angle', 'wide', '24mm', '35mm')) focal = 28;
+  else if (has('normal', 'standard', '50mm', 'nifty fifty')) focal = 50;
+  if (focal !== 50) cues.push(`${focal}mm`);
+
+  // Depth of field → aperture.
+  let aperture = 5.6;
+  if (has('shallow', 'bokeh', 'blurred background', 'blurry background', 'creamy', 'soft background', 'dof')) { aperture = 1.8; cues.push('shallow DoF'); }
+  else if (has('deep focus', 'deep-focus', 'everything sharp', 'sharp throughout', 'deep depth', 'all in focus')) { aperture = 13; cues.push('deep focus'); }
+
+  const hits = cues.length;
+  const confidence = Math.min(0.9, 0.55 + hits * 0.08);
+  const reasoning = hits ? `Interpreted: ${cues.join(', ')}. Composed the framing — tweak the fields after.` : 'No strong cue → a neutral 3/4 framing. Add words like “low angle”, “close-up”, “wide”, “shallow depth”.';
+  return { azimuth, elevation, distance, focal, aperture, confidence, reasoning };
+}
+
 // ---- video (camera move) --------------------------------------------------
 export type MotionStepT = { az: number; el: number; dist: number; focal: number; aperture: number };
 export type MotionKeyT = { t: number; pos: Vec3; ease: Ease; tOut?: Vec3; tIn?: Vec3 };

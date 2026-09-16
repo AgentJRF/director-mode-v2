@@ -3,7 +3,7 @@ import { S, PIVOT } from '../store';
 import MatchPreview, { MotionPreview } from '../three/MatchPreview';
 import { useRev } from './bits';
 import { evaluate, eulerFromLookAt, sphericalToPose, clamp } from '../lib/eval';
-import { matchCamera, matchMotion, matchLighting, lightingFromPrompt, type LightingMetrics, type LightingEstimate } from '../lib/aiMatch';
+import { matchCamera, matchMotion, matchLighting, lightingFromPrompt, cameraFromPrompt, type LightingMetrics, type LightingEstimate } from '../lib/aiMatch';
 import { fuseAB, applyMotionSpec, stepToPose, arcControls, type MotionSpec, type MotionStep } from '../lib/presets';
 import { applyLightPreset, applyRig } from '../lib/lightPresets';
 import { setEnvHdriFromImage } from '../lib/lights';
@@ -200,6 +200,80 @@ function AIImageModal() {
   );
 }
 
+// ✦ AI · Camera from a text prompt → composes a framing on the active camera (no keys). Wizard-of-Oz,
+// offline: cameraFromPrompt parses angle/height/distance/focal/DoF from the words. Live MatchPreview.
+function AICameraPromptModal() {
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [form, setForm] = useState<MatchForm | null>(null);
+  const [info, setInfo] = useState<{ confidence: number; reasoning: string } | null>(null);
+  const CHIPS = ['Low three-quarter, shallow depth', 'Top-down packshot', 'Wide establishing shot', 'Tight product close-up', 'Front-on, deep focus'];
+
+  const generate = () => {
+    if (!text.trim()) { S().toast('Describe the shot first'); return; }
+    setBusy(true);
+    const e = cameraFromPrompt(text);
+    setForm({ azimuth: e.azimuth, elevation: e.elevation, distance: e.distance, focal: e.focal, aperture: e.aperture });
+    setInfo({ confidence: e.confidence, reasoning: e.reasoning });
+    setBusy(false);
+  };
+  const applyForm = (f: MatchForm) => {
+    const r = clamp(f.distance * 2, 1.6, 14);
+    const theta = f.azimuth * Math.PI / 180;
+    const phi = clamp((90 - f.elevation) * Math.PI / 180, 0.12, Math.PI - 0.12);
+    const pos = sphericalToPose({ r, theta, phi }, PIVOT);
+    const st = S(); const cam = st.active();
+    cam.transform.position = pos;
+    cam.transform.rotation = eulerFromLookAt(pos, PIVOT.toArray() as Vec3);
+    cam.optics.focalLength = clamp(f.focal, 14, 200);
+    cam.optics.aperture = clamp(f.aperture, 1.4, 16);
+    cam.optics.focusPoint = null;
+    st.bump();
+  };
+  const apply = () => { if (!form) return; applyForm(form); S().setViewMode('camera'); S().setModal(null); S().toast('Pose composed from prompt (no keys)'); };
+  const back = () => { setForm(null); setInfo(null); };
+
+  if (form && info) {
+    const aspect = S().project.canvas.width / S().project.canvas.height;
+    const num = (label: string, key: keyof MatchForm, step: number, min: number, max: number) => (
+      <div className="row"><label>{label}</label>
+        <input type="number" step={step} value={form[key]} style={{ width: 80 }}
+          onChange={e => setForm({ ...form, [key]: clamp(parseFloat(e.target.value) || 0, min, max) })} /></div>
+    );
+    return (
+      <Shell title="AI review · Camera from prompt"
+        footer={<><button className="tbtn" onClick={back}>← Back</button><button className="tbtn primary" onClick={apply}>Apply pose</button></>}>
+        <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Preview render</div>
+        <div style={{ width: '100%', aspectRatio: String(aspect), borderRadius: 6, overflow: 'hidden', border: '1px solid var(--line-2)' }}>
+          <MatchPreview azimuth={form.azimuth} elevation={form.elevation} distance={form.distance} focal={form.focal} aperture={form.aperture} aspect={aspect} />
+        </div>
+        <div className="row" style={{ marginTop: 8 }}><label>Match</label><ConfBar c={info.confidence} /></div>
+        <p className="hint" style={{ marginTop: 6 }}><em>“{text}”</em></p>
+        <p className="hint" style={{ marginTop: 0 }}>{info.reasoning}</p>
+        <div className="sect-t" style={{ padding: 0, margin: '12px 0 2px' }}>Framing — adjustable</div>
+        {num('Azimuth °', 'azimuth', 1, -180, 180)}
+        {num('Elevation °', 'elevation', 1, -25, 85)}
+        {num('Distance ×', 'distance', 0.1, 1.2, 7)}
+        {num('Focal mm', 'focal', 1, 14, 200)}
+        {num('Aperture f/', 'aperture', 0.1, 1.4, 16)}
+        <p className="hint">Composes a shot — writes no keyframes. The timeline is unchanged.</p>
+      </Shell>
+    );
+  }
+  return (
+    <Shell title="AI · Camera from prompt"
+      footer={<><button className="tbtn" onClick={() => S().setModal('ai')}>← Back</button><button className="tbtn primary" onClick={generate}>{busy ? 'Composing…' : 'Compose shot'}</button></>}>
+      <p className="hint" style={{ marginTop: 0 }}>Describe the shot — angle, height, distance, lens, depth of field — and the AI composes a framing you can tweak (writes NO keys).</p>
+      <textarea value={text} onChange={e => setText(e.target.value)} rows={3} placeholder="e.g. low three-quarter from the left, 85mm, shallow depth of field"
+        style={{ width: '100%', resize: 'vertical', padding: 10, borderRadius: 8, border: '1px solid var(--line-2)', background: 'var(--panel-2)', color: 'var(--ink)', font: 'inherit' }} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+        {CHIPS.map(c => <button key={c} className="btn-sm" onClick={() => setText(c)}
+          style={{ padding: '4px 9px', borderRadius: 999, border: '1px solid var(--line-2)', background: 'var(--panel-2)', color: 'var(--ink-2)', cursor: 'pointer', fontSize: 11.5 }}>{c}</button>)}
+      </div>
+    </Shell>
+  );
+}
+
 // Motion estimate returned by /api/match-motion (baked Wizard-of-Oz move, or heuristic fallback).
 type MotionEstimate = { gesture: string; duration: number; ease: Ease; start: MotionStep; end: MotionStep; confidence: number; reasoning: string; mocked?: boolean; exact?: { target: Vec3 | null; focal: number; aperture: number; duration: number; keys: { t: number; pos: Vec3; ease: Ease; tOut?: Vec3; tIn?: Vec3 }[] } };
 
@@ -318,6 +392,7 @@ function AIHubModal() {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
         {tab === 'camera' ? (<>
           <Card icon={AI_ICON.camera} title="From image" desc="Compose a shot from a reference photo — angle, focal, aperture." onClick={() => S().setModal('ai-image')} />
+          <Card icon={AI_ICON.prompt} title="From a prompt" desc="Describe the shot in words — angle, lens, depth of field." onClick={() => S().setModal('ai-camera-prompt')} />
           <Card icon={AI_ICON.film} title="From video" desc="Recreate a camera move from a clip as editable keyframes." onClick={() => S().setModal('ai-video')} />
         </>) : (<>
           <Card icon={AI_ICON.rays} title="Match reference" desc="Set up a matching light rig from a reference image." onClick={() => S().setModal('ai-light-match')} />
@@ -597,6 +672,7 @@ export default function Modals() {
   if (m === 'interp') return <InterpModal />;
   if (m === 'ai') return <AIHubModal />;
   if (m === 'ai-image') return <AIImageModal />;
+  if (m === 'ai-camera-prompt') return <AICameraPromptModal />;
   if (m === 'ai-video') return <AIVideoModal />;
   if (m === 'ai-light-match') return <AILightMatchModal />;
   if (m === 'ai-light-prompt') return <AILightPromptModal />;
