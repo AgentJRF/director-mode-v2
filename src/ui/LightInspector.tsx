@@ -44,7 +44,7 @@ function Slider({ label, value, min, max, step, unit, ch, onChange }:
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0, justifyContent: 'flex-end' }}>
         <input type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(parseFloat(e.target.value))} />
         <span className="val-box">
-          <NumInput value={value} min={min} max={max} step={step} dec={step < 1 ? 1 : 0} onChange={onChange} />
+          <NumInput value={value} min={min} max={max} step={step} dec={step < 0.1 ? 2 : step < 1 ? 1 : 0} onChange={onChange} />
           {unit && <span className="val-fix">{unit}</span>}
         </span>
       </div>
@@ -129,17 +129,6 @@ export default function LightInspector() {
                 style={{ width: 34, height: 22, padding: 0, border: '1px solid var(--line-2)', borderRadius: 4, background: 'none', cursor: l.colorize ? 'pointer' : 'not-allowed', opacity: l.colorize ? 1 : 0.4 }} />
             </span>
           </div>
-          {/* Background = a seamless studio colour that fills the backdrop and grounds the product
-              (the floor becomes a lit, shadow-catching surface of this colour). Like Stager's
-              Environment > Background. */}
-          <div className="row">
-            <span className="row-lead"><span className="kf-spacer" /><label>Background</label></span>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <input type="checkbox" checked={st.project.backdrop.enabled} onChange={e => st.setBackdrop({ enabled: e.target.checked })} title="Fill the background with a colour that catches shadows + light" />
-              <input type="color" value={st.project.backdrop.color} disabled={!st.project.backdrop.enabled} onChange={e => st.setBackdrop({ color: e.target.value })}
-                style={{ width: 34, height: 22, padding: 0, border: '1px solid var(--line-2)', borderRadius: 4, background: 'none', cursor: st.project.backdrop.enabled ? 'pointer' : 'not-allowed', opacity: st.project.backdrop.enabled ? 1 : 0.4 }} />
-            </span>
-          </div>
         </div>
       )}
 
@@ -162,8 +151,9 @@ export default function LightInspector() {
         {isSpot && <Slider label="Cone" value={Math.round((l.angle ?? 0.6) * 180 / Math.PI)} min={5} max={89} step={1} unit="°"
           onChange={deg => setLightAngle(deg * Math.PI / 180)} />}
         {isSpot && <Slider label="Softness" value={l.penumbra ?? 0.5} min={0} max={1} step={0.05} onChange={setLightPenumbra} />}
-        {isArea && <Slider label="Width" value={l.width ?? 4} min={0.1} max={20} step={0.1} onChange={setLightWidth} />}
-        {isArea && <Slider label="Height" value={l.height ?? 2} min={0.1} max={20} step={0.1} onChange={setLightHeight} />}
+        {/* Range centred on the 3×3 default so the handle sits mid-track. */}
+        {isArea && <Slider label="Width" value={l.width ?? 3} min={0.1} max={6} step={0.05} onChange={setLightWidth} />}
+        {isArea && <Slider label="Height" value={l.height ?? 3} min={0.1} max={6} step={0.05} onChange={setLightHeight} />}
       </div>
 
       {isSpot && (

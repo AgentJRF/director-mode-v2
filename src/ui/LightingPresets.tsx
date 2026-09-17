@@ -101,7 +101,7 @@ function PresetScene({ preset }: { preset: CardPreset }) {
       {/* the gray asset sphere */}
       <circle cx={CX} cy={CY} r={R} fill={`url(#${gid})`} />
       {/* colour wash from each coloured light (mood tint) */}
-      {tinted.map((l, i) => <circle key={'t' + i} cx={CX} cy={CY} r={R} fill={`url(#tint-${preset.kind}-${i})`} clipPath={`url(#${clip})`} />)}
+      {tinted.map((_, i) => <circle key={'t' + i} cx={CX} cy={CY} r={R} fill={`url(#tint-${preset.kind}-${i})`} clipPath={`url(#${clip})`} />)}
       {/* gobo pattern projected on the sphere (monochrome, multiplied) */}
       {src && <image href={src} x={CX - R} y={CY - R} width={R * 2} height={R * 2} preserveAspectRatio="xMidYMid slice"
         clipPath={`url(#${clip})`} style={{ mixBlendMode: 'multiply' }} opacity="0.9" />}

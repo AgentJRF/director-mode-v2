@@ -9,7 +9,7 @@ import { evaluate, keysOf, EASE_LIST, round, poiPoint } from '../lib/eval';
 import { applyPreset } from '../lib/presets';
 import { IcTarget, IcEyedropper } from './icons';
 
-import type { Camera, Channel, Ease, Keyframe, Vec3 } from '../types';
+import type { Camera, Channel, Keyframe, Vec3 } from '../types';
 
 // Clickable keyframe marker: ◆ = key at playhead, dim ◆ = animated elsewhere, ◇ = no keys.
 // Click toggles a key at the playhead for this channel; disabled when the channel is locked.

@@ -120,6 +120,19 @@ export default function Outliner() {
   return (
     <>
       <div className="insp-h">Scene</div>
+      {/* Scene-wide background (studio colour + shadow-catching ground). Kept here, always visible,
+          rather than buried in the Environment light inspector. */}
+      <div className="sect">
+        <div className="sect-t">Scene background</div>
+        <div className="row">
+          <span className="row-lead" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <input type="checkbox" checked={proj.backdrop.enabled} onChange={e => st.setBackdrop({ enabled: e.target.checked })} title="Fill the scene background with a studio colour that catches shadows + light" />
+            <label>Background color</label>
+          </span>
+          <input type="color" value={proj.backdrop.color} disabled={!proj.backdrop.enabled} onChange={e => st.setBackdrop({ color: e.target.value })}
+            style={{ width: 34, height: 22, padding: 0, border: '1px solid var(--line-2)', borderRadius: 4, background: 'none', cursor: proj.backdrop.enabled ? 'pointer' : 'not-allowed', opacity: proj.backdrop.enabled ? 1 : 0.4 }} />
+        </div>
+      </div>
       <div className="sect ol">
         <Group title="Cameras" count={proj.cameras.length} open={open.cameras} onToggle={() => toggle('cameras')}
           onAdd={e => setAddCamMenu({ x: e.clientX, y: e.clientY })} addTitle="Add a camera">
