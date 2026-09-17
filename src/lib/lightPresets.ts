@@ -96,7 +96,7 @@ export const LIGHT_PRESETS: LightPreset[] = [
     // Teal key + magenta rim over a dark cool ambient — stylised neon night look (shows off colour).
     kind: 'neon', label: 'Neon', selectRole: 'key', envIntensity: 0.14, envColor: '#8c93e8',
     lights: [
-      { role: 'key', kind: 'spot', az: -112, el: 18.5, distMul: 0.78, intensity: 19.3, color: '#00e5e5', castShadow: true, angle: 0.384, penumbra: 0.6 },
+      { role: 'key', kind: 'spot', az: -53.93, el: 6.98, distMul: 1.161, intensity: 19.3, color: '#00e5e5', castShadow: true, angle: 0.384, penumbra: 0.6 },
       { role: 'rim', kind: 'spot', az: 158, el: 34, distMul: 1.1, intensity: 13, color: '#ff1fd0', castShadow: false, angle: 0.698, penumbra: 0.8 },
     ],
   },
@@ -132,9 +132,9 @@ function buildLight(spec: PresetLightSpec, R: number, group?: string): Light {
   return makeLight(spec.kind, roleName(spec.role), over);
 }
 
-// Make a group name unique against the groups already present (Softbox → Softbox 2, …).
-function uniqueGroup(base: string): string {
-  const used = new Set(S().project.lights.map(l => l.group).filter(Boolean) as string[]);
+// Make a group name unique against the groups present in `among` (Softbox → Softbox 2, …).
+function uniqueGroup(base: string, among: Light[]): string {
+  const used = new Set(among.map(l => l.group).filter(Boolean) as string[]);
   if (!used.has(base)) return base;
   let i = 2; while (used.has(`${base} ${i}`)) i++;
   return `${base} ${i}`;
@@ -148,7 +148,10 @@ export function applyRig(preset: LightPreset, opts?: { add?: boolean }) {
   const st = S(); const p = st.project;
   const R = OBJECT_FRAME.product || 6;
   const add = !!opts?.add;
-  const group = add ? uniqueGroup(preset.label) : undefined;
+  // add mode → keep the environment + manually-placed lights (no group), but DROP any previously-applied
+  // preset (its lights carry a group). So applying a preset replaces the last preset, never a hand-placed light.
+  const keep = add ? p.lights.filter(l => l.kind !== 'env' && !l.group) : [];
+  const group = add ? uniqueGroup(preset.label, keep) : undefined;
 
   const rig = preset.lights.map(spec => buildLight(spec, R, group));
 
@@ -159,7 +162,6 @@ export function applyRig(preset: LightPreset, opts?: { add?: boolean }) {
     if (preset.envColor) { e.color = preset.envColor; e.colorize = true; }
     else e.colorize = false;
   });
-  const keep = add ? p.lights.filter(l => l.kind !== 'env') : []; // add mode → keep existing lights
   p.lights = [...env, ...keep, ...rig];
   const sel = rig[preset.lights.findIndex(s => s.role === preset.selectRole)] ?? rig[0];
   p.activeLightId = sel.id; st.ui.inspect = 'light';

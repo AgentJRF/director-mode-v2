@@ -184,8 +184,8 @@ export default function LightingPresets() {
   const doSave = () => { saveCurrentAsPreset(name); setNaming(false); setName(''); };
   const cancelSave = () => { setNaming(false); setName(''); };
 
-  // Presets ADD their lights (in a group named after the preset) rather than replacing the working
-  // rig, so a manually-placed light is never wiped out.
+  // Applying a preset REPLACES any previously-applied preset (its grouped lights) but leaves
+  // manually-placed lights (no group) and the environment untouched.
   const applyCard = (kind: string) => {
     if (kind.startsWith('user:')) applyUserPreset(kind.slice(5), { add: true });
     else applyLightPreset(kind as LightPresetKind, { add: true });

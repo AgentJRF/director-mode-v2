@@ -42,18 +42,20 @@ export function applyUserPreset(id: string, opts?: { add?: boolean }) {
   const preset = loadUserPresets().find(p => p.id === id); if (!preset) return;
   const st = S(); const p = st.project;
   const add = !!opts?.add;
-  const group = add ? uniqueGroup(preset.name) : undefined;
+  // add mode → keep the env + manually-placed lights (no group), but DROP any previously-applied preset
+  // (grouped). Applying a preset replaces the last preset, never a hand-placed light.
+  const keep = add ? p.lights.filter(l => l.kind !== 'env' && !l.group) : [];
+  const group = add ? uniqueGroup(preset.name, keep) : undefined;
   const rig = structuredClone(preset.lights).map(l => ({ ...l, id: uid(), group, keyframes: l.keyframes.map(k => ({ ...k, id: uid() })) }));
   const env = p.lights.filter(l => l.kind === 'env');
   if (preset.env) env.forEach(e => { e.intensity = preset.env!.intensity; e.color = preset.env!.color; e.colorize = preset.env!.colorize; e.envRotation = preset.env!.envRotation; });
-  const keep = add ? p.lights.filter(l => l.kind !== 'env') : [];
   p.lights = [...env, ...keep, ...rig];
   const sel = rig[0]; if (sel) { p.activeLightId = sel.id; st.ui.inspect = 'light'; }
   st.bump(); st.toast(add ? `${preset.name} added` : `${preset.name} applied`);
 }
 
-function uniqueGroup(base: string): string {
-  const used = new Set(S().project.lights.map(l => l.group).filter(Boolean) as string[]);
+function uniqueGroup(base: string, among: Light[]): string {
+  const used = new Set(among.map(l => l.group).filter(Boolean) as string[]);
   if (!used.has(base)) return base;
   let i = 2; while (used.has(`${base} ${i}`)) i++;
   return `${base} ${i}`;
