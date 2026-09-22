@@ -38,6 +38,24 @@ export default function MatchPreview({ azimuth, elevation, distance, focal, aspe
   return <StudioCanvas><Rig pos={pos} focal={focal} aspect={aspect} /></StudioCanvas>;
 }
 
+// Fixed front-on view of the product lit by the CURRENT scene rig — used to preview an applied
+// lighting rig (AI lighting review). Straight-on front, slightly raised, aimed at the pivot; the
+// StudioCanvas carries no gizmos, so the preview stays clean and consistent every time.
+function FrontRig({ aspect }: { aspect: number }) {
+  const camera = useThree(s => s.camera) as THREE.PerspectiveCamera;
+  useFrame(() => {
+    camera.position.set(PIVOT.x, PIVOT.y + 0.45, PIVOT.z + 6.4);
+    camera.lookAt(PIVOT.x, PIVOT.y, PIVOT.z);
+    camera.filmGauge = 36; camera.setFocalLength(48);
+    camera.aspect = aspect; camera.near = 0.1; camera.far = 200; camera.updateProjectionMatrix();
+  });
+  return null;
+}
+
+export function LightingPreview({ aspect = 1 }: { aspect?: number }) {
+  return <StudioCanvas><FrontRig aspect={aspect} /></StudioCanvas>;
+}
+
 // Looping preview of a MOVE (AI video match): ping-pongs the camera along the Bézier arc from → to
 // (control points c1,c2), aiming at the product — a live thumbnail of the gesture, matching the exact
 // curve applyMotionSpec bakes into the keyframes.

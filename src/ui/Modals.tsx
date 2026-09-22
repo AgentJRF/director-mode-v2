@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { S, PIVOT } from '../store';
-import MatchPreview, { MotionPreview } from '../three/MatchPreview';
+import MatchPreview, { MotionPreview, LightingPreview } from '../three/MatchPreview';
 import { useRev } from './bits';
 import { evaluate, eulerFromLookAt, sphericalToPose, clamp } from '../lib/eval';
 import { matchCamera, matchMotion, matchLighting, lightingFromPrompt, cameraFromPrompt, type LightingMetrics, type LightingEstimate } from '../lib/aiMatch';
@@ -8,22 +8,6 @@ import { fuseAB, applyMotionSpec, stepToPose, arcControls, type MotionSpec, type
 import { applyLightPreset, applyRig } from '../lib/lightPresets';
 import { setEnvHdriFromImage } from '../lib/lights';
 import type { Ease, Vec3 } from '../types';
-
-// Grab the current WebGL viewport as a data-URL (the Canvas runs with preserveDrawingBuffer:true).
-// Waits a beat so a just-applied state change has painted under the demand frameloop.
-const captureViewport = (delayMs = 180): Promise<string | null> => new Promise(res => {
-  setTimeout(() => requestAnimationFrame(() => {
-    const c = document.querySelector('#canvas-wrap canvas') as HTMLCanvasElement | null;
-    res(c ? c.toDataURL('image/jpeg', 0.85) : null);
-  }), delayMs);
-});
-
-// Env maps load + build a PMREM asynchronously, so preload the source first, then capture the painted
-// frame. Gives the EnvNode effect (which shares the browser cache) time to finish before the snapshot.
-const captureAfterEnv = (url: string): Promise<string | null> => new Promise(res => {
-  const go = () => captureViewport(320).then(res);
-  const im = new Image(); im.onload = go; im.onerror = go; im.src = url;
-});
 
 // Wizard-of-Oz env "generation": a reference photo whose file-name matches → a real baked 360° pano
 // (in public/env) instead of stretching the flat photo across the sphere. Keyed like the other AI demos.
@@ -410,7 +394,6 @@ function AILightMatchModal() {
   const [img, setImg] = useState<{ url: string; data: string; media: string; name: string; metrics: LightingMetrics } | null>(null);
   const [busy, setBusy] = useState(false);
   const [est, setEst] = useState<LightingEstimate | null>(null);
-  const [shot, setShot] = useState<string | null>(null); // viewport capture WITH the matched rig applied (for the side-by-side)
 
   const onFile = (f?: File) => {
     if (!f) return;
@@ -442,13 +425,12 @@ function AILightMatchModal() {
       // Apply the matched rig to the live scene so the viewport shows the result, then capture it for
       // the side-by-side. "← Back" undoes this; keeping the modal open leaves it applied.
       if (e.rig) applyRig(e.rig); else applyLightPreset(e.preset);
-      setShot(await captureViewport());
       setEst(e);
     } catch { S().toast('AI request failed'); }
     setBusy(false);
   };
   const keep = () => { if (!est) return; S().setModal(null); S().toast(`${est.label} lighting applied`); };
-  const back = () => { S().undo(); setEst(null); setShot(null); }; // revert the applied rig, return to upload
+  const back = () => { S().undo(); setEst(null); }; // revert the applied rig, return to upload
 
   if (est && img) {
     return (
@@ -461,9 +443,9 @@ function AILightMatchModal() {
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Result · viewport</div>
-            {shot
-              ? <img src={shot} alt="viewport result" style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
-              : <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 6, border: '1px solid var(--line-2)', background: 'var(--panel-2)', display: 'grid', placeItems: 'center', color: 'var(--ink-2)', fontSize: 12 }}>Rendering…</div>}
+            <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--line-2)', background: '#000' }}>
+              <LightingPreview aspect={1} />
+            </div>
           </div>
         </div>
         <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--line-2)', borderRadius: 6, background: 'var(--panel-2)' }}>
@@ -497,28 +479,26 @@ function AILightPromptModal() {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [est, setEst] = useState<LightingEstimate | null>(null);
-  const [shot, setShot] = useState<string | null>(null);
   const CHIPS = ['Dramatic side light, deep shadows', 'Golden hour, warm backlight', 'Neon night — teal & magenta', 'Clean studio packshot', 'Blinds gobo pattern'];
 
   const generate = async () => {
     if (!text.trim()) { S().toast('Describe the lighting first'); return; }
     setBusy(true);
     const e = lightingFromPrompt(text);
-    if (e.rig) applyRig(e.rig); else applyLightPreset(e.preset); // apply to the live scene, then snapshot
-    setShot(await captureViewport());
+    if (e.rig) applyRig(e.rig); else applyLightPreset(e.preset); // apply to the live scene
     setEst(e); setBusy(false);
   };
   const keep = () => { if (!est) return; S().setModal(null); S().toast(`${est.label} lighting applied`); };
-  const back = () => { S().undo(); setEst(null); setShot(null); }; // revert the applied rig
+  const back = () => { S().undo(); setEst(null); }; // revert the applied rig
 
   if (est) {
     return (
       <Shell title="AI review · Lighting from prompt"
         footer={<><button className="tbtn" onClick={back}>← Back</button><button className="tbtn primary" onClick={keep}>Keep lighting</button></>}>
         <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Result · viewport</div>
-        {shot
-          ? <img src={shot} alt="viewport result" style={{ width: '100%', aspectRatio: '16 / 9', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
-          : <div style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 6, border: '1px solid var(--line-2)', background: 'var(--panel-2)', display: 'grid', placeItems: 'center', color: 'var(--ink-2)', fontSize: 12 }}>Rendering…</div>}
+        <div style={{ width: '100%', aspectRatio: '16 / 9', borderRadius: 6, overflow: 'hidden', border: '1px solid var(--line-2)', background: '#000' }}>
+          <LightingPreview aspect={16 / 9} />
+        </div>
         <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--line-2)', borderRadius: 6, background: 'var(--panel-2)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <div style={{ fontWeight: 600, fontSize: 15 }}>{est.label}</div>
@@ -562,34 +542,30 @@ function AILightEnvModal() {
   };
   const baked = file && !file.wide ? bakedEnv(file.name) : null; // matched product ref → a real 360° pano (wizard-of-oz)
   const [busy, setBusy] = useState(false);
-  const [shot, setShot] = useState<string | null>(null); // viewport WITH the env applied (side-by-side)
   const [review, setReview] = useState(false);
 
-  const generate = async () => {
+  const generate = () => {
     if (!file) { S().toast('Upload an image first'); return; }
     setBusy(true);
     const src = baked ?? file.url; const nm = baked ? 'mountain-sunset.png' : file.name;
-    setEnvHdriFromImage(src, nm);          // apply to the live scene, then snapshot for the side-by-side
-    setShot(await captureAfterEnv(src));
+    setEnvHdriFromImage(src, nm);          // apply to the live scene
     setReview(true); setBusy(false);
   };
   const keep = () => { S().setModal(null); S().toast(baked ? 'Environment generated from reference' : 'Environment built from image'); };
-  const back = () => { S().undo(); setReview(false); setShot(null); }; // revert the applied env
+  const back = () => { S().undo(); setReview(false); }; // revert the applied env
 
   if (review && file) {
     return (
       <Shell title="AI review · Env light from image"
         footer={<><button className="tbtn" onClick={back}>← Back</button><button className="tbtn primary" onClick={keep}>Keep environment</button></>}>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div>
             <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Reference</div>
-            <img src={file.url} alt="reference" style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
+            <img src={file.url} alt="reference" style={{ width: '100%', maxHeight: 160, objectFit: 'contain', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
           </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Result · viewport</div>
-            {shot
-              ? <img src={shot} alt="viewport result" style={{ width: '100%', aspectRatio: '1 / 1', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
-              : <div style={{ width: '100%', aspectRatio: '1 / 1', borderRadius: 6, border: '1px solid var(--line-2)', background: 'var(--panel-2)', display: 'grid', placeItems: 'center', color: 'var(--ink-2)', fontSize: 12 }}>Rendering…</div>}
+          <div>
+            <div className="sect-t" style={{ padding: 0, margin: '0 0 4px' }}>Generated environment · 360°</div>
+            <img src={baked ?? file.url} alt="generated environment (equirectangular)" style={{ width: '100%', aspectRatio: '2 / 1', objectFit: 'cover', borderRadius: 6, border: '1px solid var(--line-2)', background: '#000' }} />
           </div>
         </div>
         <div style={{ marginTop: 10, padding: 12, border: '1px solid var(--line-2)', borderRadius: 6, background: 'var(--panel-2)', display: 'flex', alignItems: 'center', gap: 8 }}>
