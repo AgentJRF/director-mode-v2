@@ -86,7 +86,7 @@ export interface Light {
   keyframes: Keyframe[];        // animatable: 'position' (Vec3), 'poi' (Vec3), 'intensity' (number)
 }
 
-export type Tool = 'select' | 'camera' | 'target' | 'light';
+export type Tool = 'select' | 'camera' | 'target';
 
 export interface Project {
   cameras: Camera[];
