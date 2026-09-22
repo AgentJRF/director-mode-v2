@@ -292,6 +292,13 @@ export default function SceneGizmos() {
         if (i > 0) { const o = handleOffset(pk, i, 'in'); handles.push({ which: 'in', pos: [kv[0] + o[0], kv[1] + o[1], kv[2] + o[2]] }); }
         return (
           <group key={k.id}>
+            {/* Larger INVISIBLE grab target so an anchor is easy to press — a near-miss on the tiny
+                visible dot used to start a marquee (rubber-band) instead of grabbing, which made it
+                hard to drag a multi-selection. opacity 0 keeps it raycastable (visible=false is not). */}
+            <mesh position={kv} userData={{ gizmo: { id: k.id, kind: 'key' } }} onPointerDown={multiview ? undefined : grab('key')} renderOrder={2}>
+              <sphereGeometry args={[0.16, 12, 12]} />
+              <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+            </mesh>
             <mesh position={kv} userData={{ gizmo: { id: k.id, kind: 'key' } }} onPointerDown={multiview ? undefined : grab('key')}>
               <sphereGeometry args={[0.055, 20, 20]} />
               <meshBasicMaterial color={sel ? '#ffffff' : '#f2a33c'} />
