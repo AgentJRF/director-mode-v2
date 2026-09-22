@@ -83,7 +83,11 @@ function LightNode({ light }: { light: Light }) {
       s.distance = l.distance ?? 0; s.decay = l.decay ?? 1.2;
       s.castShadow = !!l.castShadow;
       // Gobo Scale/Rotation are baked into the map canvas (three ignores a SpotLight.map's texture
-      // matrix), so nothing to update per-frame here.
+      // matrix), so nothing to update per-frame here. But r3f does NOT clear spotLight.map when the
+      // `map` prop goes back to undefined (gobo toggled Off), so the cookie would keep projecting —
+      // drive it imperatively. Changing the spot-map count makes three recompile the lit materials.
+      const wantMap = goboMap ?? null;
+      if (s.map !== wantMap) s.map = wantMap;
     }
   });
 
