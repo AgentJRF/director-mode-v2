@@ -1,6 +1,6 @@
 # Director Mode v2 — Project Summary
 
-_Up-to-date overview as of 2026-09-17. Details: [TECHNICAL-SPECS.md](TECHNICAL-SPECS.md),
+_Up-to-date overview as of 2026-09-22. Details: [TECHNICAL-SPECS.md](TECHNICAL-SPECS.md),
 [FEATURES.md](FEATURES.md) (camera), [LIGHTING-SETUP.md](LIGHTING-SETUP.md) (lighting integration),
 [HANDOFF.md](HANDOFF.md), [REVIEW-CHECKLIST.md](REVIEW-CHECKLIST.md), [ACCESS.md](ACCESS.md)._
 
@@ -43,6 +43,9 @@ No asset step required: the `.glb` and fonts are committed in the repo.
 - Multi-camera (create, duplicate, hide, ID colour); object/point target (look-at); focal/aperture
   optics; single **timeline** with Bézier keyframes + speed (ease) curves.
 - Camera creation modes: manual, move presets (orbit/arc/push/crane…), A→B interpolation.
+- **Spline editing** (Scene view): drag anchor spheres to reshape the path; rubber-band **multi-select**
+  anchors, then drag near any selected anchor to **move the whole selection together** (Shift = height).
+- Tools: Select, Camera/orbit, Target, Pick focus, Interpolate (the unused Light tool was removed).
 
 ## 6. Lighting
 
@@ -58,8 +61,9 @@ No asset step required: the `.glb` and fonts are committed in the repo.
   Rotation / Softness / Contrast** are baked into the gobo canvas (three ignores a `SpotLight.map`
   texture matrix).
 - **Lighting presets** (lit-sphere thumbnail cards): Three-point, Gobo, Golden hour, Softbox,
-  Dramatic, Noon. A preset **adds** its lights into a **named group** (collapsible, deletable) instead
-  of replacing the rig; **Save preset** for custom rigs.
+  Dramatic, Neon. Applying a preset **replaces the previously-applied preset** (its named group) but
+  **keeps manually-placed lights and the Environment** untouched; groups are collapsible/deletable and
+  **Save preset** stores custom rigs.
 - **Soft shadows**: renderer uses **VSMShadowMap** + `shadow-radius`/`blurSamples`.
 - **Scene background**: dedicated section at the top of the Scene panel (toggle + colour) with a
   shadow-catching ground — moved out of the Environment inspector for discoverability.
@@ -73,6 +77,9 @@ No asset step required: the `.glb` and fonts are committed in the repo.
   else local `claude` CLI, else a **heuristic**, plus **baked demo results by filename** — Wizard-of-Oz).
 - **On the static deploy** (Vercel): no backend → the client **automatically falls back to a
   browser-side estimate** (`aiMatch.ts`). AI flows stay usable with no server and no key (demo-grade).
+- **Review previews**: lighting-from-image/prompt shows a clean **front-on render** of the lit product
+  (via `StudioCanvas`, no gizmos, consistent framing); env-from-image shows the **generated 360°
+  panorama** below the reference (vertical layout suited to a wide equirectangular image).
 
 ## 8. Architecture — key files
 
@@ -125,6 +132,8 @@ src/
 ## 11. Notes / gotchas
 
 - **OneDrive**: the local copy is OneDrive-synced — possible sync lag; the dev server sometimes drops
-  in the background (restart `npm run dev`).
+  in the background, and **Vite's file watcher can miss an edit** so it serves stale code. If a change
+  isn't showing, **fully restart the server** (`npm run dev`) — a browser hard-reload alone isn't enough.
+  When in doubt, test on **Vercel** (fresh build from the repo) or from a fresh copy of the zip.
 - **Filename casing** (Windows): keep imports exact (`lightRig.ts` lowercase).
 - **Git identity**: Jean Fournery <fournery@adobe.com>.
