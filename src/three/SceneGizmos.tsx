@@ -137,6 +137,26 @@ export default function SceneGizmos() {
       const r = dom.getBoundingClientRect();
       rc.setFromCamera(new THREE.Vector2(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1), camera);
       if (rc.intersectObjects(blockMeshes(), false).length) return; // pressing a key or the camera → let its handler run
+      // If keys are selected and the press lands NEAR a selected anchor (screen-space), start a group
+      // move instead of a marquee — so dragging a multi-selection doesn't require a pixel-perfect grab
+      // of the tiny sphere (a near-miss used to rubber-band a new box and reset the selection).
+      const selIds = S().ui.selectedKeyIds;
+      if (selIds.length) {
+        const c0 = S().active(); const cpx = e.clientX - r.left, cpy = e.clientY - r.top; const v = new THREE.Vector3();
+        let near: typeof c0.keyframes[number] | null = null, bestD = 16; // px threshold (independent of zoom)
+        for (const k of c0.keyframes) {
+          if (k.channel !== 'position' || !Array.isArray(k.value) || !selIds.includes(k.id)) continue;
+          v.set(...(k.value as Vec3)).project(camera); if (v.z > 1) continue;
+          const sx = (v.x * 0.5 + 0.5) * r.width, sy = (-v.y * 0.5 + 0.5) * r.height;
+          const d = Math.hypot(sx - cpx, sy - cpy); if (d < bestD) { bestD = d; near = k; }
+        }
+        if (near) {
+          const group = c0.keyframes.filter(kf => kf.channel === 'position' && selIds.includes(kf.id) && Array.isArray(kf.value)).map(kf => ({ id: kf.id, orig: (kf.value as Vec3).slice() as Vec3 }));
+          dragTarget.current = { id: near.id, kind: 'key', group, anchor: (near.value as Vec3).slice() as Vec3 };
+          S().setGizmoDragging(true);
+          return; // group move takes over; no marquee
+        }
+      }
       const rr = wrapRect(); start = { x: e.clientX - rr.left, y: e.clientY - rr.top };
       // Don't show the box yet: wait for a real drag in `move`, and bail if a gizmo drag starts in
       // the meantime — the down-time guard alone missed it (PivotControls sets gizmoDragging slightly
